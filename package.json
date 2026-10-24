@@ -8,12 +8,19 @@
   },
   "scripts": {
     "test": "node --test frontend/tests/auth.test.js",
-    "dev": "vite --host 0.0.0.0",
+    "dev": "concurrently -k -n api,web \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "node backend/server.js",
+    "dev:web": "vite --host 0.0.0.0",
+    "start:api": "node backend/server.js",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.0"
+    "@google/genai": "^1.52.0",
+    "@supabase/supabase-js": "^2.57.0",
+    "concurrently": "^9.2.5",
+    "dotenv": "^17.4.2",
+    "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
     "vite": "^6.3.5"

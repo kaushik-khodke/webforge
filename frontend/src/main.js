@@ -1,5 +1,6 @@
 import { getAuthRedirectUrl, getSupabase, getSupabaseConfig, isSupabaseConfigured, registerPatient } from "./supabase.js";
 import { signInOrCreatePatient } from "./auth.js";
+import { apiRequest } from "./api.js";
 
 let manualAuthInProgress = false;
 
@@ -29,6 +30,11 @@ const state = {
   adminCounts: null,
   trainingRuns: [],
   modelSearch: "",
+  chatMessages: [],
+  chatBusy: false,
+  chatAttachment: null,
+  chatDraft: "",
+  extractionStarted: new Set(),
 };
 
 const iconPaths = {
@@ -158,7 +164,7 @@ function navMarkup(items) {
 function sidebar(role) {
   const patient = role === "patient";
   const items = patient ? patientNav : adminNav;
-  return `<aside class="sidebar" id="sidebar"><div class="sidebar-brand">${brand()}<button class="sidebar-close" data-action="close-menu">×</button></div><div class="workspace-pill"><span class="workspace-avatar ${patient ? "patient-avatar" : "admin-avatar"}">${patient ? "P" : "A"}</span><span><b>${patient ? "Patient space" : "Admin studio"}</b><small>${patient ? "Your personal health space" : "Model management"}</small></span><span class="chevron">⌄</span></div><nav class="side-nav">${navMarkup(items)}</nav><div class="sidebar-bottom"><div class="help-card"><div class="help-orb">${icon(patient ? "heart" : "spark", 17)}</div><b>${patient ? "Need a hand?" : "Studio guide"}</b><p>${patient ? "The companion will be available when its service is connected." : "Review models and validation before publishing."}</p><button data-route="${patient ? "patient/assistant" : "admin/lab"}">${patient ? "AI companion" : "Open training lab"} ${icon("arrow", 13)}</button></div><button class="profile-row"><span class="profile-avatar">${displayInitials()}</span><span><b>${escapeHtml(state.profile?.full_name || state.user?.email || "Account")}</b><small>${patient ? "Patient account" : "Workspace admin"}</small></span><span class="profile-more">···</span></button><button class="logout-link" data-action="logout">${icon("logout", 16)} Sign out</button></div></aside>`;
+  return `<aside class="sidebar" id="sidebar"><div class="sidebar-brand">${brand()}<button class="sidebar-close" data-action="close-menu">×</button></div><div class="workspace-pill"><span class="workspace-avatar ${patient ? "patient-avatar" : "admin-avatar"}">${patient ? "P" : "A"}</span><span><b>${patient ? "Patient space" : "Admin studio"}</b><small>${patient ? "Your personal health space" : "Model management"}</small></span><span class="chevron">⌄</span></div><nav class="side-nav">${navMarkup(items)}</nav><div class="sidebar-bottom"><div class="help-card"><div class="help-orb">${icon(patient ? "heart" : "spark", 17)}</div><b>${patient ? "Need a hand?" : "Studio guide"}</b><p>${patient ? "Ask about your documents and health questions." : "Review models and validation before publishing."}</p><button data-route="${patient ? "patient/assistant" : "admin/lab"}">${patient ? "AI companion" : "Open training lab"} ${icon("arrow", 13)}</button></div><button class="profile-row"><span class="profile-avatar">${displayInitials()}</span><span><b>${escapeHtml(state.profile?.full_name || state.user?.email || "Account")}</b><small>${patient ? "Patient account" : "Workspace admin"}</small></span><span class="profile-more">···</span></button><button class="logout-link" data-action="logout">${icon("logout", 16)} Sign out</button></div></aside>`;
 }
 
 function topbar(role, title) {
@@ -185,7 +191,7 @@ function patientDashboard() {
   return `${pageHeader(formattedDate(), `A little more clarity, ${first}.`, "Your health space brings your information together in one calm, easy-to-understand place.", action)}
   <div class="welcome-banner"><div class="welcome-copy"><span class="welcome-label">YOUR HEALTH SNAPSHOT <span class="soft-pill">PERSONAL SPACE</span></span><h2>${assessments ? "Your health story<br/>is taking shape." : "Your story is still<br/>taking shape."}</h2><p>${assessments ? `You have ${assessments} saved assessment${assessments === 1 ? "" : "s"}. Review your history whenever you need.` : "Add a health report or explore an available model to begin building your personal picture."}</p><button class="light-button" data-route="${docs ? "patient/documents" : "patient/models"}">${docs ? "View your documents" : "Explore available models"} ${icon("arrow", 15)}</button></div><div class="snapshot-art"><div class="snapshot-rings"><i></i><i></i><i></i><div class="snapshot-heart">${icon("heart", 28)}</div><span class="satellite sat-a"></span><span class="satellite sat-b"></span></div><div class="snapshot-float float-a"><span>${String(docs).padStart(2,"0")}</span> Your documents</div><div class="snapshot-float float-b"><span>${String(assessments).padStart(2,"0")}</span> Saved assessments</div><div class="snapshot-glint">✦</div></div></div>
   <div class="section-row"><div><span class="section-kicker">YOUR SPACE</span><h2>Where would you like to begin?</h2></div><button class="subtle-link" data-route="patient/history">View activity ${icon("arrow", 14)}</button></div>
-  <div class="feature-grid"><button class="feature-card docs-card" data-route="patient/documents"><span class="feature-top"><span class="feature-icon peach-icon">${icon("file", 19)}</span><span class="feature-arrow">${icon("arrow", 15)}</span></span><span class="feature-title">Your documents</span><span class="feature-desc">${docs ? `${docs} document${docs === 1 ? "" : "s"} in your library.` : "Bring health reports together in your private library."}</span><span class="feature-foot"><span class="tiny-dot peach-dot"></span> Private to your account</span></button><button class="feature-card model-card" data-route="patient/models"><span class="feature-top"><span class="feature-icon lilac-icon">${icon("box", 19)}</span><span class="feature-arrow">${icon("arrow", 15)}</span></span><span class="feature-title">Explore health models</span><span class="feature-desc">Review available models and what each one is designed to estimate.</span><span class="feature-foot"><span class="tiny-dot purple-dot"></span> Model details and intended use</span></button><button class="feature-card ai-card" data-route="patient/assistant"><span class="feature-top"><span class="feature-icon mint-icon">${icon("spark", 19)}</span><span class="feature-arrow">${icon("arrow", 15)}</span></span><span class="feature-title">AI companion</span><span class="feature-desc">A guided assistant will be added when its service is connected.</span><span class="feature-foot"><span class="tiny-dot mint-dot"></span> Planned capability</span></button></div>
+  <div class="feature-grid"><button class="feature-card docs-card" data-route="patient/documents"><span class="feature-top"><span class="feature-icon peach-icon">${icon("file", 19)}</span><span class="feature-arrow">${icon("arrow", 15)}</span></span><span class="feature-title">Your documents</span><span class="feature-desc">${docs ? `${docs} document${docs === 1 ? "" : "s"} in your library.` : "Bring health reports together in your private library."}</span><span class="feature-foot"><span class="tiny-dot peach-dot"></span> Private to your account</span></button><button class="feature-card model-card" data-route="patient/models"><span class="feature-top"><span class="feature-icon lilac-icon">${icon("box", 19)}</span><span class="feature-arrow">${icon("arrow", 15)}</span></span><span class="feature-title">Explore health models</span><span class="feature-desc">Review available models and what each one is designed to estimate.</span><span class="feature-foot"><span class="tiny-dot purple-dot"></span> Model details and intended use</span></button><button class="feature-card ai-card" data-route="patient/assistant"><span class="feature-top"><span class="feature-icon mint-icon">${icon("spark", 19)}</span><span class="feature-arrow">${icon("arrow", 15)}</span></span><span class="feature-title">AI companion</span><span class="feature-desc">Ask about your reports and get answers grounded in your own history.</span><span class="feature-foot"><span class="tiny-dot mint-dot"></span> Personal context available</span></button></div>
   <div class="dashboard-bottom"><div class="panel recent-panel"><div class="panel-heading"><div><span class="section-kicker">YOUR RECORD</span><h3>Recent assessments</h3></div><button class="subtle-link" data-route="patient/history">View history ${icon("arrow", 13)}</button></div>${assessments ? state.assessments.slice(0,3).map(assessmentRow).join("") : `<div class="empty-activity"><div class="empty-activity-icon">${icon("clock", 19)}</div><div><b>No assessments yet</b><span>When a prediction model is connected, saved results will appear here.</span></div></div>`}</div><div class="panel privacy-panel"><span class="privacy-orb">${icon("shield", 19)}</span><span class="section-kicker">BUILT AROUND YOU</span><h3>Your health,<br/>on your terms.</h3><p>Choose what you share and decide how you use each insight.</p><button data-action="privacy">Privacy and data access ${icon("arrow", 13)}</button></div></div>`;
 }
 
@@ -196,9 +202,9 @@ function assessmentRow(item) {
 }
 
 function documentsPage() {
-  const docs = state.documents.length ? state.documents.map(doc => `<div class="document-row"><span class="doc-type">${icon("file", 17)}</span><span class="document-name"><b>${escapeHtml(doc.original_name)}</b><small>${escapeHtml(new Date(doc.created_at).toLocaleDateString())} · ${escapeHtml(doc.mime_type || "Document")}</small></span><span class="doc-status">${escapeHtml(doc.processing_status || "Stored")}</span></div>`).join("") : `<div class="empty-documents"><div class="empty-file-stack"><span>${icon("file", 25)}</span><span>${icon("file", 25)}</span><span>${icon("upload", 23)}</span></div><b>No documents yet</b><span>Documents you upload privately will appear here.</span><button class="text-button" data-action="choose-document">Choose a file ${icon("arrow", 13)}</button></div>`;
+  const docs = state.documents.length ? state.documents.map(doc => `<div class="document-row"><span class="doc-type">${icon("file", 17)}</span><span class="document-name"><b>${escapeHtml(doc.original_name)}</b><small>${escapeHtml(new Date(doc.created_at).toLocaleDateString())} · ${escapeHtml(doc.mime_type || "Document")}</small></span><span class="doc-status">${escapeHtml(doc.processing_status === "ready" ? "Text ready" : doc.processing_status || "Stored")}</span>${doc.processing_status !== "ready" ? `<button class="text-button" data-extract-document="${escapeHtml(doc.id)}">Extract text</button>` : ""}</div>`).join("") : `<div class="empty-documents"><div class="empty-file-stack"><span>${icon("file", 25)}</span><span>${icon("file", 25)}</span><span>${icon("upload", 23)}</span></div><b>No documents yet</b><span>Documents you upload privately will appear here.</span><button class="text-button" data-action="choose-document">Choose a file ${icon("arrow", 13)}</button></div>`;
   return `${pageHeader("YOUR INFORMATION", "Your documents", "Upload and keep health documents in your private library.", `<button class="primary-button compact" data-action="choose-document">${icon("plus", 16)} Add document</button>`)}
-  <div class="upload-zone" id="upload-zone"><input id="document-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.csv,.txt" multiple hidden/><div class="upload-icon">${icon("upload", 21)}</div><div><b>Drop a document here</b><span>or <button class="text-button" data-action="choose-document">browse your files</button> · PDF, image, CSV or text · up to 15 MB</span></div><span class="upload-private">${icon("shield", 14)} Private to your account</span></div>
+  <div class="upload-zone" id="upload-zone"><input id="document-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.txt" multiple hidden/><div class="upload-icon">${icon("upload", 21)}</div><div><b>Drop a document here</b><span>or <button class="text-button" data-action="choose-document">browse your files</button> · PDF, image, CSV or text · up to 15 MB</span></div><span class="upload-private">${icon("shield", 14)} Private to your account</span></div>
   <div class="panel documents-panel"><div class="panel-heading"><div><span class="section-kicker">DOCUMENT LIBRARY</span><h3>Your documents <span class="count-badge">${state.documents.length}</span></h3></div></div>${docs}</div><div class="notice-strip">${icon("shield", 16)} <span><b>Private storage</b> Files are stored in your account’s private Supabase Storage folder.</span></div>`;
 }
 
@@ -209,7 +215,27 @@ function modelsPage() {
 }
 
 function assistantPage() {
-  return `${pageHeader("A CALM PLACE TO ASK", "Your AI companion", "A guided assistant for understanding health terms and navigating your health space.", `<span class="availability"><i></i> SERVICE NOT CONNECTED</span>`)}<div class="assistant-layout"><section class="chat-panel"><div class="chat-top"><div class="assistant-presence"><span class="agent-avatar large">✦</span><span><b>Luma companion</b><small><i class="offline-dot"></i> Waiting for AI service</small></span></div></div><div class="chat-messages assistant-unavailable"><div class="agent-avatar large">✦</div><b>Your companion is getting ready.</b><span>Conversation is disabled until the agent service is connected. No scripted replies are shown as real AI responses.</span></div><form class="chat-composer" id="chat-form"><input name="message" placeholder="AI service not connected" disabled/><button type="submit" disabled aria-label="Send message">${icon("arrow", 17)}</button></form><div class="chat-disclaimer">When available, the assistant will support understanding and preparation, not diagnosis or emergency care.</div></section><aside class="assistant-aside"><span class="section-kicker">PLANNED CAPABILITIES</span><div class="prompt-card static-prompt"><span class="prompt-symbol prompt-lilac">?</span><span><b>Explain a health term</b><small>In clear, everyday language</small></span></div><div class="prompt-card static-prompt"><span class="prompt-symbol prompt-peach">${icon("box", 16)}</span><span><b>Find the right model</b><small>Explore model focus and inputs</small></span></div><div class="prompt-card static-prompt"><span class="prompt-symbol prompt-mint">${icon("heart", 16)}</span><span><b>Prepare for a visit</b><small>Organize questions for a clinician</small></span></div><div class="agent-boundary">${icon("shield", 16)}<span><b>Safety boundary</b><small>The agent will not diagnose, prescribe, or replace clinical care.</small></span></div></aside></div>`;
+  const messages = state.chatMessages.length ? state.chatMessages.map(message => `
+    <article class="chat-bubble ${message.role === "user" ? "from-me" : "from-agent"}">
+      ${message.role === "assistant" ? `<span class="agent-avatar">✦</span>` : ""}
+      <div><span class="chat-text">${escapeHtml(message.content)}</span>
+      ${message.image_document_id ? `<small class="chat-attachment-label">${icon("file", 13)} Image attached</small>` : ""}
+      ${message.role === "assistant" && message.sources?.length ? `<small class="chat-sources">Sources: ${escapeHtml([...new Set(message.sources.map(source => source.name))].join(", "))}</small>` : ""}
+      ${message.role === "assistant" && message.model_runs?.some(run => run.available) ? `<small class="chat-sources">Model result included</small>` : ""}</div>
+    </article>`).join("") : `<div class="chat-start"><span class="agent-avatar large">✦</span><h3>Ask about your health story.</h3><p>I can explain your uploaded reports, help prepare questions for a clinician, and use a published model when its inference service is connected.</p></div>`;
+  return `${pageHeader("YOUR HEALTH, IN CONTEXT", "Your AI companion", "Ask about your documents, assessments, or an image you attach.", `<span class="availability"><i></i> AI COMPANION READY</span>`)}
+    <div class="assistant-layout"><section class="chat-panel">
+      <div class="chat-top"><div class="assistant-presence"><span class="agent-avatar large">✦</span><span><b>Luma companion</b><small><i></i> Your private health context</small></span></div></div>
+      <div class="chat-messages" id="chat-messages" aria-live="polite">${messages}${state.chatBusy ? `<div class="chat-bubble from-agent"><span class="agent-avatar">✦</span><div>Thinking through your question…</div></div>` : ""}</div>
+      ${state.chatAttachment ? `<div class="chat-selected-image">${icon("file", 16)} ${escapeHtml(state.chatAttachment.name)} <button type="button" data-action="clear-chat-image" aria-label="Remove attached image">×</button></div>` : ""}
+      <form class="chat-composer" id="chat-form"><label class="chat-attach" title="Attach an image" aria-label="Attach an image">${icon("plus", 20)}<input id="chat-image-input" type="file" accept="image/png,image/jpeg,image/webp" hidden ${state.chatBusy ? "disabled" : ""}/></label><input name="message" placeholder="Ask about a report or attach an image…" autocomplete="off" value="${escapeHtml(state.chatDraft)}" ${state.chatBusy ? "disabled" : ""}/><button type="submit" ${state.chatBusy ? "disabled" : ""} aria-label="Send message">${icon("arrow", 17)}</button></form>
+      <div class="chat-disclaimer">For understanding and preparation. Luma does not diagnose or replace your clinician.</div>
+    </section><aside class="assistant-aside"><span class="section-kicker">TRY ASKING</span>
+      <button class="prompt-card" data-chat-prompt="Summarize my uploaded health reports in plain language."><span class="prompt-symbol prompt-lilac">?</span><span><b>Summarize my reports</b><small>Key details from your documents</small></span></button>
+      <button class="prompt-card" data-chat-prompt="What questions should I ask my clinician about my recent results?"><span class="prompt-symbol prompt-peach">${icon("file", 16)}</span><span><b>Prepare for a visit</b><small>Questions based on your history</small></span></button>
+      <button class="prompt-card" data-chat-prompt="Is there a published model that can help with my question?"><span class="prompt-symbol prompt-mint">${icon("box", 16)}</span><span><b>Explore model support</b><small>Use a model when connected</small></span></button>
+      <div class="agent-boundary">${icon("shield", 16)}<span><b>Your context stays in your account</b><small>Relevant excerpts and attached images are sent to Gemini to answer your question.</small></span></div>
+    </aside></div>`;
 }
 
 function historyPage() {
@@ -235,7 +261,7 @@ function adminInsights() {
 }
 
 function publishPage() {
-  return `${pageHeader("MODEL STUDIO / REGISTRY", "Add a model", "Create a model record and optionally store its first artifact version.", `<span class="step-count">DRAFT UNTIL REVIEWED</span>`)}<div class="publish-layout"><form class="panel publish-form" id="publish-form"><div class="form-section-title"><span class="form-step">01</span><div><h3>Model details</h3><p>Describe the outcome and intended use in clear language.</p></div></div><label class="field-label">Model name <span>*</span><input required name="modelName" placeholder="e.g. Diabetes risk overview"/></label><label class="field-label">Health outcome<select name="outcome" required><option value="">Choose a health outcome</option><option>Diabetes risk</option><option>Cardiovascular risk</option><option>Other health outcome</option></select></label><div class="field-row"><label class="field-label">Model type<select name="modelType"><option value="tabular_classification">Tabular classification</option><option value="regression">Regression</option><option value="image_classification">Image classification</option></select></label><label class="field-label">Version<input name="version" value="0.1.0" required/></label></div><label class="field-label">Description<textarea name="description" rows="3" placeholder="What does this model estimate? What should users know before using it?" required></textarea><small class="field-hint">This description is visible in the patient model library.</small></label><div class="form-section-title file-title"><span class="form-step">02</span><div><h3>Model artifact</h3><p>Optionally store a private first version. Publishing stays a separate review step.</p></div></div><label class="artifact-drop" for="model-file"><input type="file" id="model-file" accept=".onnx,.joblib,.pkl,.pickle,.zip"/><span class="artifact-icon">${icon("upload", 19)}</span><b id="artifact-name">Choose a model artifact</b><small>ONNX, joblib, pickle or ZIP · up to 250 MB</small><span class="artifact-note">Stored in the private model-artifacts bucket.</span></label><div class="form-actions"><button type="submit" class="primary-button">Save model draft ${icon("arrow", 15)}</button></div></form><aside class="publish-aside"><div class="publish-preview-card"><span class="section-kicker">PATIENT MODEL CARD</span><div class="preview-card-art"><div class="preview-blob">◌</div><span class="preview-small-chip">MODEL</span></div><span class="preview-kind">HEALTH MODEL</span><h3>Your model name</h3><p>A clear description helps people understand what the model is designed to estimate.</p><span class="preview-publish-state">Visible after review ${icon("arrow", 13)}</span></div><div class="publish-checklist"><span class="section-kicker">BEFORE PUBLISHING</span><p>${icon("check", 14)} Record dataset provenance</p><p>${icon("check", 14)} Add intended use and limits</p><p>${icon("check", 14)} Validate a version</p><p>${icon("check", 14)} Review before publishing</p></div></aside></div>`;
+  return `${pageHeader("MODEL STUDIO / REGISTRY", "Add a model", "Create a model record and optionally store its first artifact version.", `<span class="step-count">DRAFT UNTIL REVIEWED</span>`)}<div class="publish-layout"><form class="panel publish-form" id="publish-form"><div class="form-section-title"><span class="form-step">01</span><div><h3>Model details</h3><p>Describe the outcome and intended use in clear language.</p></div></div><label class="field-label">Model name <span>*</span><input required name="modelName" placeholder="e.g. Diabetes risk overview"/></label><label class="field-label">Health outcome<select name="outcome" required><option value="">Choose a health outcome</option><option>Diabetes risk</option><option>Cardiovascular risk</option><option>Other health outcome</option></select></label><div class="field-row"><label class="field-label">Model type<select name="modelType"><option value="tabular_classification">Tabular classification</option><option value="regression">Regression</option><option value="image_classification">Image classification</option><option value="qml">Quantum ML (tabular)</option></select></label><label class="field-label">Version<input name="version" value="0.1.0" required/></label></div><label class="field-label">Description<textarea name="description" rows="3" placeholder="What does this model estimate? What should users know before using it?" required></textarea><small class="field-hint">This description is visible in the patient model library.</small></label><div class="form-section-title file-title"><span class="form-step">02</span><div><h3>Model artifact</h3><p>Optionally store a private first version. Publishing stays a separate review step.</p></div></div><label class="artifact-drop" for="model-file"><input type="file" id="model-file" accept=".onnx,.joblib,.pkl,.pickle,.zip"/><span class="artifact-icon">${icon("upload", 19)}</span><b id="artifact-name">Choose a model artifact</b><small>ONNX, joblib, pickle or ZIP · up to 250 MB</small><span class="artifact-note">Stored in the private model-artifacts bucket.</span></label><div class="form-actions"><button type="submit" class="primary-button">Save model draft ${icon("arrow", 15)}</button></div></form><aside class="publish-aside"><div class="publish-preview-card"><span class="section-kicker">PATIENT MODEL CARD</span><div class="preview-card-art"><div class="preview-blob">◌</div><span class="preview-small-chip">MODEL</span></div><span class="preview-kind">HEALTH MODEL</span><h3>Your model name</h3><p>A clear description helps people understand what the model is designed to estimate.</p><span class="preview-publish-state">Visible after review ${icon("arrow", 13)}</span></div><div class="publish-checklist"><span class="section-kicker">BEFORE PUBLISHING</span><p>${icon("check", 14)} Record dataset provenance</p><p>${icon("check", 14)} Add intended use and limits</p><p>${icon("check", 14)} Validate a version</p><p>${icon("check", 14)} Review before publishing</p></div></aside></div>`;
 }
 
 function labPage() {
@@ -506,6 +532,11 @@ async function loadPageData(page) {
       const { data, error } = await state.supabase.from("documents").select("id,original_name,mime_type,created_at,processing_status").eq("owner_id", state.user.id).order("created_at", { ascending: false });
       if (error) throw error;
       state.documents = data || [];
+      const pending = state.documents.filter(doc => ["stored", "queued"].includes(doc.processing_status) && !state.extractionStarted.has(doc.id));
+      if (pending.length) window.setTimeout(() => processPendingDocuments(pending), 0);
+    } else if (page === "patient/assistant") {
+      const { messages } = await apiRequest("/api/chat/messages");
+      state.chatMessages = messages || [];
     } else if (page === "patient/models") {
       const { data, error } = await state.supabase.from("health_models").select("id,name,outcome,description,model_type,status,required_attributes,updated_at").eq("status", "published").order("updated_at", { ascending: false });
       if (error) throw error;
@@ -601,33 +632,68 @@ function bindDynamicPage() {
 
 async function uploadDocuments(files) {
   if (!state.supabase || !state.user) return;
-  const allowed = new Set(["application/pdf", "image/png", "image/jpeg", "text/csv", "text/plain"]);
   const selected = [...files];
   if (!selected.length) return;
   state.pageBusy = true;
   render();
+  let saved = 0;
+  let failed = 0;
   for (const file of selected) {
-    if (file.size > 15 * 1024 * 1024 || !allowed.has(file.type)) {
-      state.pageBusy = false;
-      render();
-      toast(`${file.name} was skipped: choose a supported file under 15 MB.`);
-      continue;
-    }
-    const path = `${state.user.id}/${crypto.randomUUID()}-${file.name.replace(/[\\/]/g, "_")}`;
-    const storage = state.supabase.storage.from("patient-documents");
-    const { error: uploadError } = await storage.upload(path, file, { contentType: file.type, upsert: false });
-    if (uploadError) { state.pageBusy = false; render(); toast(`Upload failed: ${uploadError.message}`); continue; }
-    const { error: rowError } = await state.supabase.from("documents").insert({ owner_id: state.user.id, storage_path: path, original_name: file.name, mime_type: file.type, byte_size: file.size });
-    if (rowError) {
-      await storage.remove([path]);
-      state.pageBusy = false;
-      render();
-      toast(`Document record failed: ${friendlyDataError(rowError)}`);
-      continue;
-    }
+    try { await storePatientDocument(file); saved += 1; }
+    catch (error) { failed += 1; toast(`${file.name}: ${friendlyDataError(error)}`); }
   }
   await loadPageData("patient/documents");
-  toast("Your document library is up to date.");
+  if (saved && !failed) toast(`${saved} document${saved === 1 ? "" : "s"} stored and processed.`);
+}
+
+async function storePatientDocument(file) {
+  const allowed = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp", "text/csv", "text/plain"]);
+  if (!allowed.has(file.type) || file.size > 15 * 1024 * 1024) throw new Error("Choose a supported file under 15 MB.");
+  if (file.type.startsWith("image/") && file.size > 10 * 1024 * 1024) throw new Error("Choose an image under 10 MB for text extraction.");
+  const path = `${state.user.id}/${crypto.randomUUID()}-${file.name.replace(/[\\/]/g, "_")}`;
+  const storage = state.supabase.storage.from("patient-documents");
+  const { error: uploadError } = await storage.upload(path, file, { contentType: file.type, upsert: false });
+  if (uploadError) throw uploadError;
+  const { data: document, error: rowError } = await state.supabase.from("documents").insert({
+    owner_id: state.user.id, storage_path: path, original_name: file.name,
+    mime_type: file.type, byte_size: file.size, processing_status: "queued",
+  }).select("id").single();
+  if (rowError) { await storage.remove([path]); throw rowError; }
+  await apiRequest("/api/documents/extract", { method: "POST", body: { documentId: document.id } });
+  return document.id;
+}
+
+async function processPendingDocuments(documents) {
+  for (const doc of documents) {
+    state.extractionStarted.add(doc.id);
+    try { await apiRequest("/api/documents/extract", { method: "POST", body: { documentId: doc.id } }); }
+    catch (error) { toast(`${doc.original_name}: ${friendlyDataError(error)}`); }
+  }
+  if (state.page === "patient/documents") await loadPageData("patient/documents");
+}
+
+async function sendChat(form) {
+  if (state.chatBusy || !state.user) return;
+  const message = String(new FormData(form).get("message") || "").trim();
+  state.chatDraft = message;
+  const attachment = state.chatAttachment;
+  if (!message && !attachment) return;
+  state.chatBusy = true;
+  render();
+  try {
+    const imageDocumentId = attachment ? await storePatientDocument(attachment) : null;
+    const { message: reply } = await apiRequest("/api/chat", { method: "POST", body: { message, imageDocumentId } });
+    state.chatAttachment = null;
+    state.chatDraft = "";
+    const { messages } = await apiRequest("/api/chat/messages");
+    state.chatMessages = messages || [reply];
+  } catch (error) {
+    toast(friendlyDataError(error));
+  } finally {
+    state.chatBusy = false;
+    render();
+    $("#chat-messages")?.scrollTo({ top: $("#chat-messages").scrollHeight });
+  }
 }
 
 async function createModel(form) {
@@ -652,6 +718,7 @@ async function createModel(form) {
       slug: slugify(modelName),
       outcome: String(values.get("outcome") || "").trim(),
       model_type: String(values.get("modelType") || "tabular_classification"),
+      input_modality: String(values.get("modelType")) === "image_classification" ? "image" : "tabular",
       description: String(values.get("description") || "").trim(),
       status: "draft",
       required_attributes: [],
@@ -692,6 +759,10 @@ document.addEventListener("click", async event => {
   }
   const routeButton = event.target.closest("[data-route]");
   if (routeButton) { route(routeButton.dataset.route); return; }
+  const prompt = event.target.closest("[data-chat-prompt]");
+  if (prompt) { const input = $("#chat-form input[name=message]"); state.chatDraft = prompt.dataset.chatPrompt; if (input) { input.value = state.chatDraft; input.focus(); } return; }
+  const retryExtraction = event.target.closest("[data-extract-document]");
+  if (retryExtraction) { await processPendingDocuments([{ id: retryExtraction.dataset.extractDocument, original_name: "Document" }]); return; }
   const roleButton = event.target.closest("[data-role]");
   if (roleButton) {
     if (state.authBusy) return;
@@ -705,6 +776,7 @@ document.addEventListener("click", async event => {
   if (oauth) { await startOAuth(oauth.dataset.oauth); return; }
   const action = event.target.closest("[data-action]")?.dataset.action;
   if (action === "choose-document") $("#document-input")?.click();
+  if (action === "clear-chat-image") { state.chatAttachment = null; render(); }
   if (action === "show-password") { const input = $("input[name=password]"); input.type = input.type === "password" ? "text" : "password"; event.target.textContent = input.type === "password" ? "Show" : "Hide"; }
   if (action === "forgot" && !state.authBusy) { state.authMode = "reset"; state.authError = ""; state.authNotice = ""; render(); }
   if (action === "back-to-login" && !state.authBusy) { state.authMode = "signin"; state.authError = ""; state.authNotice = ""; render(); }
@@ -720,10 +792,20 @@ document.addEventListener("click", async event => {
 
 document.addEventListener("change", event => {
   if (event.target.id === "document-input") uploadDocuments(event.target.files);
+  if (event.target.id === "chat-image-input") {
+    const file = event.target.files?.[0];
+    if (file && (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024)) {
+      toast("Choose a PNG, JPEG, or WebP image under 10 MB.");
+      return;
+    }
+    state.chatAttachment = file || null;
+    render();
+  }
   if (event.target.id === "model-file" && event.target.files[0]) $("#artifact-name").textContent = event.target.files[0].name;
 });
 
 document.addEventListener("input", event => {
+  if (event.target.matches("#chat-form input[name=message]")) state.chatDraft = event.target.value;
   if (event.target.id === "model-search") {
     state.modelSearch = event.target.value;
     const grid = $(".model-grid");
@@ -742,7 +824,7 @@ document.addEventListener("submit", async event => {
   event.preventDefault();
   if (event.target.id === "login-form") await signIn(event.target);
   if (event.target.id === "publish-form") await createModel(event.target);
-  if (event.target.id === "chat-form") event.preventDefault();
+  if (event.target.id === "chat-form") await sendChat(event.target);
 });
 
 window.addEventListener("hashchange", () => {

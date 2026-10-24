@@ -23,6 +23,7 @@ const state = {
   toast: "",
   mobileMenu: false,
   documents: [],
+  documentCount: 0,
   models: [],
   assessments: [],
   modelVersions: [],
@@ -32,6 +33,8 @@ const state = {
   modelSearch: "",
   localModels: [],
   localResult: null,
+  localImagePreview: null,
+  localImageName: "",
   federation: { sites: [], models: [] },
   chatMessages: [],
   chatBusy: false,
@@ -69,6 +72,55 @@ function icon(name, size = 18) {
 
 function escapeHtml(value = "") {
   return String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+}
+
+function chatInline(text) {
+  return escapeHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/__(.+?)__/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+function renderAssistantText(content) {
+  const lines = String(content || "").replace(/\r\n?/g, "\n").split("\n");
+  const blocks = [];
+  let paragraph = [];
+  let list = [];
+  let listTag = "";
+  const flushParagraph = () => {
+    if (paragraph.length) blocks.push(`<p>${paragraph.map(chatInline).join("<br>")}</p>`);
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (list.length) blocks.push(`<${listTag}>${list.map(item => `<li>${chatInline(item)}</li>`).join("")}</${listTag}>`);
+    list = [];
+    listTag = "";
+  };
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) { flushParagraph(); flushList(); continue; }
+    const heading = trimmed.match(/^#{1,4}\s+(.+)$/);
+    if (heading) {
+      flushParagraph(); flushList();
+      blocks.push(`<h4>${chatInline(heading[1])}</h4>`);
+      continue;
+    }
+    const bullet = trimmed.match(/^[-*+]\s+(.+)$/);
+    const numbered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    if (bullet || numbered) {
+      flushParagraph();
+      const nextTag = bullet ? "ul" : "ol";
+      if (listTag && listTag !== nextTag) flushList();
+      listTag = nextTag;
+      list.push((bullet || numbered)[1]);
+      continue;
+    }
+    flushList();
+    paragraph.push(trimmed);
+  }
+  flushParagraph();
+  flushList();
+  return blocks.join("");
 }
 
 function displayName() {
@@ -189,7 +241,7 @@ function dataErrorBlock(message) {
 function patientDashboard() {
   const action = `<button class="primary-button compact" data-route="patient/models">Explore models ${icon("arrow", 15)}</button>`;
   const first = escapeHtml(displayName());
-  const docs = state.documents.length;
+  const docs = state.documentCount;
   const assessments = state.assessments.length;
   return `${pageHeader(formattedDate(), `A little more clarity, ${first}.`, "Your health space brings your information together in one calm, easy-to-understand place.", action)}
   <div class="welcome-banner"><div class="welcome-copy"><span class="welcome-label">YOUR HEALTH SNAPSHOT <span class="soft-pill">PERSONAL SPACE</span></span><h2>${assessments ? "Your health story<br/>is taking shape." : "Your story is still<br/>taking shape."}</h2><p>${assessments ? `You have ${assessments} saved assessment${assessments === 1 ? "" : "s"}. Review your history whenever you need.` : "Add a health report or explore an available model to begin building your personal picture."}</p><button class="light-button" data-route="${docs ? "patient/documents" : "patient/models"}">${docs ? "View your documents" : "Explore available models"} ${icon("arrow", 15)}</button></div><div class="snapshot-art"><div class="snapshot-rings"><i></i><i></i><i></i><div class="snapshot-heart">${icon("heart", 28)}</div><span class="satellite sat-a"></span><span class="satellite sat-b"></span></div><div class="snapshot-float float-a"><span>${String(docs).padStart(2,"0")}</span> Your documents</div><div class="snapshot-float float-b"><span>${String(assessments).padStart(2,"0")}</span> Saved assessments</div><div class="snapshot-glint">✦</div></div></div>
@@ -205,10 +257,56 @@ function assessmentRow(item) {
 }
 
 function documentsPage() {
-  const docs = state.documents.length ? state.documents.map(doc => `<div class="document-row"><span class="doc-type">${icon("file", 17)}</span><span class="document-name"><b>${escapeHtml(doc.original_name)}</b><small>${escapeHtml(new Date(doc.created_at).toLocaleDateString())} · ${escapeHtml(doc.mime_type || "Document")}</small></span><span class="doc-status">${escapeHtml(doc.processing_status === "ready" ? "Text ready" : doc.processing_status || "Stored")}</span>${doc.processing_status !== "ready" ? `<button class="text-button" data-extract-document="${escapeHtml(doc.id)}">Extract text</button>` : ""}</div>`).join("") : `<div class="empty-documents"><div class="empty-file-stack"><span>${icon("file", 25)}</span><span>${icon("file", 25)}</span><span>${icon("upload", 23)}</span></div><b>No documents yet</b><span>Documents you upload privately will appear here.</span><button class="text-button" data-action="choose-document">Choose a file ${icon("arrow", 13)}</button></div>`;
+  const validDocuments = state.documents.filter(doc => doc?.id);
+  const docs = validDocuments.length ? validDocuments.map(doc => `<div class="document-row"><span class="doc-type">${icon("file", 17)}</span><span class="document-name"><b>${escapeHtml(doc.original_name)}</b><small>${escapeHtml(new Date(doc.created_at).toLocaleDateString())} · ${escapeHtml(doc.mime_type || "Document")}</small></span><span class="doc-status">${escapeHtml(doc.processing_status === "ready" ? "Text ready" : doc.processing_status || "Stored")}</span>${doc.processing_status !== "ready" ? `<button class="text-button" data-extract-document="${escapeHtml(doc.id)}">Extract text</button>` : ""}</div>`).join("") : `<div class="empty-documents"><div class="empty-file-stack"><span>${icon("file", 25)}</span><span>${icon("file", 25)}</span><span>${icon("upload", 23)}</span></div><b>No documents yet</b><span>Documents you upload privately will appear here.</span><button class="text-button" data-action="choose-document">Choose a file ${icon("arrow", 13)}</button></div>`;
   return `${pageHeader("YOUR INFORMATION", "Your documents", "Upload and keep health documents in your private library.", `<button class="primary-button compact" data-action="choose-document">${icon("plus", 16)} Add document</button>`)}
   <div class="upload-zone" id="upload-zone"><input id="document-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.txt" multiple hidden/><div class="upload-icon">${icon("upload", 21)}</div><div><b>Drop a document here</b><span>or <button class="text-button" data-action="choose-document">browse your files</button> · PDF, image, CSV or text · up to 15 MB</span></div><span class="upload-private">${icon("shield", 14)} Private to your account</span></div>
-  <div class="panel documents-panel"><div class="panel-heading"><div><span class="section-kicker">DOCUMENT LIBRARY</span><h3>Your documents <span class="count-badge">${state.documents.length}</span></h3></div></div>${docs}</div><div class="notice-strip">${icon("shield", 16)} <span><b>Private storage</b> Files are stored in your account’s private Supabase Storage folder.</span></div>`;
+  <div class="panel documents-panel"><div class="panel-heading"><div><span class="section-kicker">DOCUMENT LIBRARY</span><h3>Your documents <span class="count-badge">${validDocuments.length}</span></h3></div></div>${docs}</div><div class="notice-strip">${icon("shield", 16)} <span><b>Private storage</b> Files are stored in your account’s private Supabase Storage folder.</span></div>`;
+}
+
+function scanScoreRow(item, index) {
+  const name = escapeHtml(String(item.name || "Finding").replaceAll("_", " "));
+  const percent = Math.max(0, Math.min(100, Number(item.score) * 100));
+  const value = percent.toFixed(1);
+  return `<div class="scan-score-row"><span class="scan-score-rank">${String(index + 1).padStart(2, "0")}</span><div class="scan-score-body"><div class="scan-score-label"><b>${name}</b><strong>${value}%</strong></div><div class="scan-score-track" role="progressbar" aria-label="${name} model score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${value}"><span style="width:${value}%"></span></div></div></div>`;
+}
+
+const scanFindingDescriptions = {
+  Atelectasis: "an area of the lung that is not fully inflated",
+  Cardiomegaly: "an enlarged heart outline on an X-ray",
+  Consolidation: "a dense area in the lung that can have several causes",
+  Edema: "possible fluid buildup in the lungs",
+  Effusion: "fluid in the space around a lung",
+  Emphysema: "lung changes that can occur with emphysema",
+  Fibrosis: "scarring in lung tissue",
+  Hernia: "tissue extending through an opening in the diaphragm",
+  Infiltration: "a nonspecific area of increased lung density",
+  Mass: "a larger abnormal-looking area",
+  Nodule: "a small, rounded spot in the lung",
+  "Pleural Thickening": "thickening of the lining around a lung",
+  Pneumonia: "a lung infection",
+  Pneumothorax: "air around a lung that can make it collapse",
+};
+
+function renderScanReport(result) {
+  const findings = (Array.isArray(result.findings) ? result.findings : [])
+    .filter(item => item && Number.isFinite(Number(item.score)))
+    .sort((a, b) => Number(b.score) - Number(a.score));
+  const leading = findings[0];
+  const rawLeadingName = leading ? String(leading.name || "a finding").replaceAll("_", " ") : "a finding";
+  const leadingName = escapeHtml(rawLeadingName);
+  const leadingScore = leading ? `${(Math.max(0, Math.min(1, Number(leading.score))) * 100).toFixed(1)}%` : "—";
+  const leadingDescription = scanFindingDescriptions[rawLeadingName];
+  const preview = state.localImagePreview ? `<img src="${escapeHtml(state.localImagePreview)}" alt="The image submitted for this model report"/>` : `<span class="scan-preview-empty">Image preview unavailable</span>`;
+  return `<article class="scan-report" aria-label="Chest X-ray model report">
+    <header class="scan-report-head"><div><span class="scan-report-eyebrow">LUMA / IMAGE ASSESSMENT</span><h3>Your X-ray, explained</h3><p>CheXNet · Experimental analysis</p></div><span class="scan-report-status">Clinical review advised</span></header>
+    <div class="scan-report-summary"><span class="scan-report-summary-label">THE SHORT ANSWER</span><h4>The model highlighted ${leadingName} most.</h4><p>${leadingDescription ? `This label refers to ${escapeHtml(leadingDescription)}. ` : ""}Its score was <strong>${leadingScore}</strong>. That score is not a diagnosis or your chance of having the condition.</p></div>
+    <div class="scan-report-decision"><div class="scan-decision-primary"><span>SHOULD I SEE A DOCTOR?</span><strong>Yes — arrange a review of this X-ray.</strong><p>A clinician can check the original image together with your symptoms and medical history, then tell you whether any follow-up is needed.</p></div><div class="scan-decision-secondary"><span>DOES THIS MEAN I AM FINE?</span><strong>That cannot be determined here.</strong><p>These model scores cannot confirm or rule out disease, even when every score is low.</p></div></div>
+    <div class="scan-report-grid"><section class="scan-report-image"><div class="scan-report-section-heading"><span>01 / SUBMITTED IMAGE</span></div><div class="scan-preview">${preview}</div><p title="${escapeHtml(state.localImageName)}">${escapeHtml(state.localImageName || "Uploaded image")}</p></section>
+      <section class="scan-report-scores"><div class="scan-report-section-heading"><span>02 / MODEL OUTPUT</span><small>Highest five of ${findings.length} findings</small></div><div class="scan-score-list">${findings.slice(0, 5).map(scanScoreRow).join("") || `<p>No model scores were returned.</p>`}</div>${findings.length > 5 ? `<details class="scan-more-scores"><summary>View all ${findings.length} scores</summary><div class="scan-score-list">${findings.slice(5).map((item, index) => scanScoreRow(item, index + 5)).join("")}</div></details>` : ""}</section></div>
+    <div class="scan-report-guidance"><div><span class="scan-guidance-icon">i</span><div><b>How to read the scores</b><p>Each bar is a separate model output. They do not add up to 100%. The model cannot tell where a finding is or how severe it is.</p></div></div><div><span class="scan-guidance-icon">!</span><div><b>When to get urgent help</b><p>Seek urgent medical care for severe difficulty breathing or sudden, persistent chest pain, regardless of these scores.</p></div></div></div>
+    <footer class="scan-report-footer"><span>Experimental output · Not a diagnosis</span><button class="outline-button" type="button" data-route="patient/history">View assessment history ${icon("arrow", 14)}</button></footer>
+  </article>`;
 }
 
 function modelsPage() {
@@ -221,14 +319,14 @@ function modelsPage() {
     <div class="model-grid">${local}${published || (!local ? `<div class="panel empty-state">No models available yet.</div>` : "")}</div>
     <section class="panel local-inference"><span class="section-kicker">CHEST X-RAY</span><h2>Try CheXNet locally</h2><p>Choose a chest radiograph image. This experimental output is saved to your assessment history; it is not a diagnosis.</p>
       <form id="local-predict-form"><label class="field-label">Chest X-ray image<input id="local-image" type="file" accept="image/png,image/jpeg,image/webp" required/></label><button class="primary-button" type="submit">Analyze image</button></form>
-      ${result ? `<div class="local-result"><h3>Model scores</h3><p>${escapeHtml(result.notice || "")}</p><ul>${(result.findings || []).slice().sort((a,b) => b.score - a.score).slice(0,5).map(item => `<li>${escapeHtml(item.name)}: ${(item.score * 100).toFixed(1)}%</li>`).join("")}</ul></div>` : ""}
+      ${result ? renderScanReport(result) : ""}
     </section>`;
 }
 function assistantPage() {
   const messages = state.chatMessages.length ? state.chatMessages.map(message => `
     <article class="chat-bubble ${message.role === "user" ? "from-me" : "from-agent"}">
       ${message.role === "assistant" ? `<span class="agent-avatar">✦</span>` : ""}
-      <div><span class="chat-text">${escapeHtml(message.content)}</span>
+      <div><div class="chat-text ${message.role === "assistant" ? "chat-rich" : ""}">${message.role === "assistant" ? renderAssistantText(message.content) : escapeHtml(message.content)}</div>
       ${message.image_document_id ? `<small class="chat-attachment-label">${icon("file", 13)} Image attached</small>` : ""}
       ${message.role === "assistant" && message.sources?.length ? `<small class="chat-sources">Sources: ${escapeHtml([...new Set(message.sources.map(source => source.name))].join(", "))}</small>` : ""}
       ${message.role === "assistant" && message.model_runs?.some(run => run.available) ? `<small class="chat-sources">Model result included</small>` : ""}</div>
@@ -554,6 +652,7 @@ async function loadPageData(page) {
       const { data, error } = await state.supabase.from("documents").select("id,original_name,mime_type,created_at,processing_status").eq("owner_id", state.user.id).order("created_at", { ascending: false });
       if (error) throw error;
       state.documents = data || [];
+      state.documentCount = state.documents.length;
       const pending = state.documents.filter(doc => ["stored", "queued"].includes(doc.processing_status) && !state.extractionStarted.has(doc.id));
       if (pending.length) window.setTimeout(() => processPendingDocuments(pending), 0);
     } else if (page === "patient/assistant") {
@@ -578,7 +677,7 @@ async function loadPageData(page) {
       ]);
       if (docRes.error) throw docRes.error;
       if (assessmentRes.error) throw assessmentRes.error;
-      state.documents = Array.from({ length: docRes.count || 0 });
+      state.documentCount = docRes.count || 0;
       state.assessments = assessmentRes.data || [];
     } else if (page === "admin/dashboard" || page === "admin/insights" || page === "admin/access" || page === "admin/lab") {
       await loadAdminData(page);
@@ -744,6 +843,9 @@ async function predictLocalModel(form) {
       modelId: "cxr-pneumo-cnn", fileName: file.name, image: { mimeType: file.type, data: btoa(binary) },
     } });
     if (!result.available) throw new Error(result.reason || "The model could not run.");
+    if (state.localImagePreview) URL.revokeObjectURL(state.localImagePreview);
+    state.localImagePreview = URL.createObjectURL(file);
+    state.localImageName = file.name;
     state.localResult = result.result;
     render();
   } catch (error) {

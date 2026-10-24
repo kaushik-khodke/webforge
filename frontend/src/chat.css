@@ -7,6 +7,16 @@
 .chat-bubble { max-width: min(86%, 660px); }
 .chat-bubble > div { font-size: 1rem; padding: 14px 16px; overflow-wrap: anywhere; }
 .chat-text { display: block; white-space: pre-wrap; }
+.chat-rich { white-space: normal; line-height: 1.65; }
+.chat-rich p { margin: 0 0 11px; }
+.chat-rich p:last-child, .chat-rich ul:last-child, .chat-rich ol:last-child { margin-bottom: 0; }
+.chat-rich h4 { margin: 15px 0 7px; color: #342c48; font-size: 1.05rem; line-height: 1.35; font-weight: 750; }
+.chat-rich h4:first-child { margin-top: 0; }
+.chat-rich strong { color: #3d3264; font-weight: 750; }
+.chat-rich ul, .chat-rich ol { margin: 5px 0 12px; padding-left: 22px; }
+.chat-rich li { padding-left: 2px; margin: 4px 0; }
+.chat-rich li::marker { color: #8571d3; }
+.chat-rich code { padding: 2px 5px; border-radius: 5px; background: #ebe7f6; font-size: .9em; }
 .chat-sources, .chat-attachment-label { display: block; font-size: .8125rem; margin-top: 10px; opacity: .8; line-height: 1.4; }
 .chat-composer { min-height: 60px; margin: 8px 16px 12px; padding: 7px; gap: 9px; }
 .chat-composer input { min-width: 0; font-size: 1rem; }

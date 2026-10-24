@@ -1,0 +1,64 @@
+{
+  "dataset": "CDC Cardiovascular Disease Cleaned Dataset (308,854 Records)",
+  "train_test_split": "80/20 Stratified",
+  "total_samples": 2500,
+  "test_samples": 500,
+  "last_updated": "2026-10-24 14:03:13",
+  "benchmarks": [
+    {
+      "Model Name": "Hybrid Stacking (VQC + XGBoost + RF)",
+      "Family": "Hybrid Quantum-Classical",
+      "Accuracy (%)": 73.2,
+      "Sensitivity (%)": 83.2,
+      "Specificity (%)": 63.2,
+      "Precision (%)": 69.33,
+      "F1-Score": 0.7564,
+      "ROC-AUC": 0.7842,
+      "Latency (ms)": 2.04
+    },
+    {
+      "Model Name": "Gradient Boosting / XGBoost",
+      "Family": "Classical Tree Ensemble",
+      "Accuracy (%)": 72.4,
+      "Sensitivity (%)": 82.0,
+      "Specificity (%)": 62.8,
+      "Precision (%)": 68.79,
+      "F1-Score": 0.7482,
+      "ROC-AUC": 0.778,
+      "Latency (ms)": 0.0
+    },
+    {
+      "Model Name": "Random Forest",
+      "Family": "Classical Bagging",
+      "Accuracy (%)": 73.6,
+      "Sensitivity (%)": 82.8,
+      "Specificity (%)": 64.4,
+      "Precision (%)": 69.93,
+      "F1-Score": 0.7582,
+      "ROC-AUC": 0.7895,
+      "Latency (ms)": 0.04
+    },
+    {
+      "Model Name": "Cardiovascular 6-Qubit VQC",
+      "Family": "Pure Quantum Parameterized",
+      "Accuracy (%)": 52.2,
+      "Sensitivity (%)": 46.0,
+      "Specificity (%)": 58.4,
+      "Precision (%)": 52.51,
+      "F1-Score": 0.4904,
+      "ROC-AUC": 0.5201,
+      "Latency (ms)": 2.04
+    },
+    {
+      "Model Name": "Logistic Regression",
+      "Family": "Classical Linear Baseline",
+      "Accuracy (%)": 72.8,
+      "Sensitivity (%)": 79.6,
+      "Specificity (%)": 66.0,
+      "Precision (%)": 70.07,
+      "F1-Score": 0.7453,
+      "ROC-AUC": 0.8018,
+      "Latency (ms)": 0.12
+    }
+  ]
+}

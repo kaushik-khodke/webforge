@@ -1,0 +1,18 @@
+{
+  "model_id": "cardiovascular_vqc",
+  "name": "Cardiovascular Disease Variational Quantum Classifier",
+  "version": "1.0.0",
+  "problem_statement": "SIH 26139: Hybrid Quantum Machine Learning Platform for Early Disease Detection",
+  "task": "binary_classification",
+  "disease_target": "Cardiovascular Disease / Coronary Heart Disease Indication",
+  "qubits": 6,
+  "circuit_depth": 12,
+  "entanglement_gates": 12,
+  "feature_map": "AngleFeatureMap_Ry_Rz",
+  "ansatz": "StronglyEntanglingVariationalLayers",
+  "backend_default": "PennyLane.default.qubit (Statevector Simulator)",
+  "required_features": ["age", "trestbps", "chol", "thalach", "oldpeak", "cp"],
+  "dataset": "UCI Cleveland Heart Disease (303 records)",
+  "validation_strategy": "80/20 Stratified Split (Seed 42)",
+  "status": "VALIDATED_PRODUCTION"
+}

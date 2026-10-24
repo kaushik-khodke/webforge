@@ -24,3 +24,5 @@ backend/supabase/seed.local.sql
 Thumbs.db
 .vscode/
 .idea/
+
+backend/ml/chexnet/models/

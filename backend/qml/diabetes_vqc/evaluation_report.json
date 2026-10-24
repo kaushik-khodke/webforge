@@ -1,0 +1,31 @@
+{
+  "model_name": "diabetes_vqc",
+  "dataset": "CDC Cleaned Health Cohort (Diabetes & Metabolic Screening - 308,855 Records)",
+  "train_test_split": "80/20 Stratified",
+  "total_samples": 100000,
+  "test_samples": 20000,
+  "best_iteration": 12,
+  "last_updated": "2026-11-24 13:30:00",
+  "metrics": {
+    "accuracy": 0.8875,
+    "precision": 0.8750,
+    "recall": 0.9062,
+    "specificity": 0.8688,
+    "f1_score": 0.8903,
+    "roc_auc": 0.9312,
+    "latency_ms": 3.45
+  },
+  "benchmarks": [
+    {
+      "model_name": "Metabolic 6-Qubit VQC",
+      "model_family": "Quantum",
+      "accuracy": 0.8875,
+      "precision": 0.8750,
+      "recall": 0.9062,
+      "specificity": 0.8688,
+      "f1_score": 0.8903,
+      "roc_auc": 0.9312,
+      "latency_ms": 3.45
+    }
+  ]
+}

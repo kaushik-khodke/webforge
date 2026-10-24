@@ -1,0 +1,75 @@
+{
+  "model_name": "pulmonary_vqc",
+  "dataset": "Global Pulmonary Function & Respiratory Impairment Clinical Cohort (COPD/Asthma - 8,500 Records)",
+  "train_test_split": "80/20 Stratified",
+  "total_samples": 8500,
+  "test_samples": 1700,
+  "best_iteration": 15,
+  "last_updated": "2026-10-24 13:30:00",
+  "metrics": {
+    "accuracy": 0.8941,
+    "precision": 0.8812,
+    "recall": 0.9125,
+    "specificity": 0.8756,
+    "f1_score": 0.8966,
+    "roc_auc": 0.9385,
+    "latency_ms": 3.62
+  },
+  "benchmarks": [
+    {
+      "model_name": "Pulmonary 6-Qubit VQC",
+      "model_family": "Quantum",
+      "accuracy": 0.8941,
+      "precision": 0.8812,
+      "recall": 0.9125,
+      "specificity": 0.8756,
+      "f1_score": 0.8966,
+      "roc_auc": 0.9385,
+      "latency_ms": 3.62
+    },
+    {
+      "model_name": "Hybrid Stacking (VQC + XGBoost + RF)",
+      "model_family": "Quantum-Classical Hybrid",
+      "accuracy": 0.9235,
+      "precision": 0.9140,
+      "recall": 0.9350,
+      "specificity": 0.9120,
+      "f1_score": 0.9244,
+      "roc_auc": 0.9610,
+      "latency_ms": 5.30
+    },
+    {
+      "model_name": "Gradient Boosting / XGBoost",
+      "model_family": "Classical",
+      "accuracy": 0.8647,
+      "precision": 0.8520,
+      "recall": 0.8820,
+      "specificity": 0.8474,
+      "f1_score": 0.8667,
+      "roc_auc": 0.9120,
+      "latency_ms": 1.80
+    },
+    {
+      "model_name": "Random Forest",
+      "model_family": "Classical",
+      "accuracy": 0.8529,
+      "precision": 0.8410,
+      "recall": 0.8710,
+      "specificity": 0.8348,
+      "f1_score": 0.8557,
+      "roc_auc": 0.8985,
+      "latency_ms": 1.25
+    },
+    {
+      "model_name": "Logistic Regression",
+      "model_family": "Classical",
+      "accuracy": 0.8176,
+      "precision": 0.8050,
+      "recall": 0.8380,
+      "specificity": 0.7972,
+      "f1_score": 0.8212,
+      "roc_auc": 0.8690,
+      "latency_ms": 0.40
+    }
+  ]
+}

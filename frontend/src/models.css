@@ -1,0 +1,11 @@
+.local-inference{margin-top:24px;padding:28px;display:grid;gap:12px}
+.local-inference h2{font-size:var(--text-heading);margin:0}
+.local-inference p{font-size:var(--text-body);line-height:1.6;max-width:65ch}
+.local-inference form{display:flex;align-items:end;gap:18px;flex-wrap:wrap}
+.local-inference .field-label{min-width:min(100%,360px);flex:1}
+.local-inference input[type=file]{padding:10px;background:#fff}
+.local-result{margin-top:8px;padding:20px;border:1px solid #dfd8f0;background:#f7f4ff;border-radius:18px}
+.local-result h3{font-size:var(--text-title);margin:0 0 6px}
+.local-result ul{margin:12px 0 0;padding-left:22px;line-height:1.8;font-size:var(--text-body)}
+.lab-config form{margin-top:22px}
+.lab-config .registry-row{justify-content:space-between}

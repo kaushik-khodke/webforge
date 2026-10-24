@@ -43,7 +43,35 @@ Run `npm test` for authentication flow checks and `npm run build` to compile the
 
 The upload saves each file in private Supabase Storage and its metadata in `documents`. The backend then extracts PDF and plain text locally; images and scanned PDFs use Gemini OCR. All readable text is split into patient-owned `document_chunks` under row-level security and indexed for full text search. Opening the document page or asking the assistant also processes files uploaded before this feature was added. A failed extraction stays visible with an **Extract text** retry button. Images must be under 10 MB for OCR; other documents may be up to 15 MB.
 
-The patient chat saves conversation history in `chat_messages` and retrieves relevant excerpts from that patient's documents and recent assessments for each question. It can accept PNG, JPEG, and WebP images. The patient sees source document names below grounded answers. Excerpts and attached images are sent to Gemini for the requested answer. The default model is `gemini-3.1-flash-lite`, configurable through `GEMINI_MODEL`. Quota is controlled by the Gemini account, not by this app.
+The patient chat saves conversation history in `chat_messages` and retrieves relevant excerpts from that patient's documents and recent assessments for each question. It can accept PNG, JPEG, and WebP images. The patient sees source document names below grounded answers. Excerpts and attached images are sent to Gemini for the requested answer. The default model is `gemini-3.1-flash-lite`, configurable through `GEMINI_MODEL`. For rate limit or temporary service failures, it retries once with `GEMINI_FALLBACK_MODEL` (default `gemini-3.5-flash-lite`). Quota is controlled by the Gemini account, not by this app.
+
+## Local medical models and federated training
+
+The old project contains three checkpoint **updates**, which are copied locally with `powershell -File scripts/install-local-models.ps1` when `MY-HealthChain` is a sibling folder. Pass `-Source <absolute-path-to-old-backend/ml>` for another layout. The script verifies SHA-256 before and after copying. Model binaries, private site data, and generated checkpoints are Git-ignored; every developer runs the script against their own local copy. Never place private patient data in the repository.
+
+The CheXNet update contains a complete 14-output DenseNet-121 state dictionary. The patient model library and chatbot can run it on a PNG, JPEG, or WebP **chest X-ray** after signing in. The library saves each direct result in assessment history. Its scores are experimental, unvalidated in this project, and are not a clinical diagnosis. The copied CT-CLIP and CMR-AI files contain only small adapter/head updates. Their full foundation checkpoints are absent from the old folder, so both are displayed as unavailable rather than running random weights. The generic published-model connector below remains available for future ML/QML services.
+
+Install a compatible Python environment with `torch`, `torchvision`, `numpy`, and `Pillow`, then set `PYTHON_BIN` to that Python executable if it is not on `PATH`. The Node backend launches Python for local inference and training. A GPU is optional but training on CPU can be slow.
+
+The admin lab runs real, single-machine multi-silo FedAvg for the CheXNet classifier. Set `FL_DATA_ROOT` to a private directory, or use `backend/ml/federated/sites/`. Add at least two subfolders (one per site), each with at least four chest X-ray images and a `labels.csv` file. Example:
+
+```text
+sites/
+  hospital-a/
+    labels.csv
+    images/xray-001.png
+  hospital-b/
+    labels.csv
+    images/xray-002.png
+```
+
+```csv
+image,pneumonia
+images/xray-001.png,1
+images/xray-002.png,0
+```
+
+Labels must be explicitly supplied as 0 or 1; the training code never infers them from filenames. Every round starts each site from the same global classifier, trains locally, and averages classifier parameters weighted by the site's training sample count. It holds out 20% of each site's images and reports actual held-out accuracy. Run status and metrics are recorded in Supabase `training_runs`; generated checkpoints stay local. This is a local federation prototype: site data is read by one machine, there is no remote hospital networking, no differential privacy guarantee, and no clinical validation. A completed experimental checkpoint becomes the local model for subsequent inferences. Restart or refresh the admin lab to see status changes.
 
 The backend validates the Supabase user token for each request and uses that user's row-level security permissions. It does not need a service-role key. Keep the backend running wherever the frontend is hosted, set `VITE_API_URL` to its public HTTPS origin, and allow the frontend origin through `CORS_ORIGIN`.
 
@@ -68,6 +96,6 @@ The agent receives metadata only for published models. It can invoke a model onl
 
 Connected when Supabase settings and migrations are present: email/password auth, patient signup/reset, OAuth callback, role-aware routing, profile reads, model records, documents, assessment history, admin reporting, model draft metadata, private storage uploads, document extraction, private text retrieval, and Gemini chat when the backend and API key are available.
 
-Not connected yet: the external ML/QML inference service, federated training, ML training jobs, dataset parsing for training, assessment creation from model results, model publishing workflow, report export, and user invitations. The inference connector is ready for a published approved model and a configured service endpoint; no prediction values are simulated.
+Not connected yet: full CT-CLIP and CMR-AI inference, QML inference, remote federated clients, model publishing approval workflow, report export, and user invitations. The external inference connector is ready for a published approved model and a configured service endpoint; no prediction values are simulated.
 
 See [`backend/SUPABASE_PLAN.md`](./backend/SUPABASE_PLAN.md) for the schema, access model, and next backend steps.

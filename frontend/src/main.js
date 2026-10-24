@@ -30,6 +30,9 @@ const state = {
   adminCounts: null,
   trainingRuns: [],
   modelSearch: "",
+  localModels: [],
+  localResult: null,
+  federation: { sites: [], models: [] },
   chatMessages: [],
   chatBusy: false,
   chatAttachment: null,
@@ -210,10 +213,17 @@ function documentsPage() {
 
 function modelsPage() {
   const filtered = state.models.filter(model => `${model.name} ${model.outcome || ""} ${model.description || ""}`.toLowerCase().includes(state.modelSearch.toLowerCase()));
-  const cards = filtered.map((model, index) => `<article class="model-tile"><div class="model-tile-top"><span class="model-art-icon ${["model-lilac","model-peach","model-mint"][index%3]}">${["◌","⌁","✳"][index%3]}</span><span class="model-status">${escapeHtml(model.status)}</span></div><span class="model-kind">${escapeHtml((model.outcome || model.model_type || "HEALTH MODEL").toUpperCase())}</span><h3>${escapeHtml(model.name)}</h3><p>${escapeHtml(model.description || "Model description has not been added yet.")}</p><div class="model-meta"><span>${icon("file", 14)} ${Array.isArray(model.required_attributes) ? model.required_attributes.length : 0} selected attributes</span><span>${icon("shield", 14)} Decision support</span></div><button class="outline-button" data-model-id="${escapeHtml(model.id)}">View model <span>${icon("arrow", 14)}</span></button></article>`).join("");
-  return `${pageHeader("A GROWING COLLECTION", "Explore health models", "Review a model’s focus and intended use before starting an assessment.", `<span class="collection-count">${state.models.length} PUBLISHED</span>`)}<div class="model-intro-banner"><div class="model-intro-art"><span class="model-disc disc-1"></span><span class="model-disc disc-2"></span><span class="model-disc disc-3"></span><span class="model-art-dot">✦</span></div><div><span class="section-kicker">START WITH A QUESTION</span><h2>Find a model that fits<br/>what you want to learn.</h2><p>Only models reviewed and published by the admin will appear here.</p></div><span class="preview-label">MODEL LIBRARY</span></div><div class="section-row models-toolbar"><div><span class="section-kicker">AVAILABLE MODELS</span><h2>Made to explore</h2></div><label class="search-field">${icon("search", 16)}<input id="model-search" placeholder="Search models" value="${escapeHtml(state.modelSearch)}"/></label></div><div class="model-grid">${state.pageBusy ? loadingBlock("Loading published models…") : cards || `<div class="panel empty-state"><span class="empty-state-icon">${icon("box", 19)}</span><b>${state.modelSearch ? "No matching models" : "No models published yet"}</b><span>${state.modelSearch ? "Try another search." : "Published health models will appear here when the admin adds them."}</span></div>`}</div>`;
+  const published = filtered.map(model => `<article class="model-tile"><div class="model-tile-top"><span class="model-art-icon model-lilac">◌</span><span class="model-status">${escapeHtml(model.status)}</span></div><span class="model-kind">${escapeHtml(model.model_type || "HEALTH MODEL")}</span><h3>${escapeHtml(model.name)}</h3><p>${escapeHtml(model.description || "No description provided.")}</p><span class="model-meta">Admin published model</span></article>`).join("");
+  const local = state.localModels.filter(model => `${model.name} ${model.task}`.toLowerCase().includes(state.modelSearch.toLowerCase())).map(model => `<article class="model-tile"><div class="model-tile-top"><span class="model-art-icon model-peach">✳</span><span class="model-status">${escapeHtml(model.status)}</span></div><span class="model-kind">LOCAL CHECKPOINT</span><h3>${escapeHtml(model.name)}</h3><p>${escapeHtml(model.description)}</p><div class="model-meta"><span>${escapeHtml(model.task)}</span></div>${model.available ? `<button class="outline-button" data-choose-local="${model.id}">Use this model ${icon("arrow", 14)}</button>` : `<small>${escapeHtml(model.reason)}</small>`}</article>`).join("");
+  const result = state.localResult;
+  return `${pageHeader("MODEL LIBRARY", "Explore health models", "Review model status and run a local experimental checkpoint when available.", `<span class="collection-count">${state.models.length + state.localModels.length} MODELS</span>`)}
+    <div class="section-row models-toolbar"><div><span class="section-kicker">AVAILABLE MODELS</span><h2>Choose a model</h2></div><label class="search-field">${icon("search", 16)}<input id="model-search" placeholder="Search models" value="${escapeHtml(state.modelSearch)}"/></label></div>
+    <div class="model-grid">${local}${published || (!local ? `<div class="panel empty-state">No models available yet.</div>` : "")}</div>
+    <section class="panel local-inference"><span class="section-kicker">CHEST X-RAY</span><h2>Try CheXNet locally</h2><p>Choose a chest radiograph image. This experimental output is saved to your assessment history; it is not a diagnosis.</p>
+      <form id="local-predict-form"><label class="field-label">Chest X-ray image<input id="local-image" type="file" accept="image/png,image/jpeg,image/webp" required/></label><button class="primary-button" type="submit">Analyze image</button></form>
+      ${result ? `<div class="local-result"><h3>Model scores</h3><p>${escapeHtml(result.notice || "")}</p><ul>${(result.findings || []).slice().sort((a,b) => b.score - a.score).slice(0,5).map(item => `<li>${escapeHtml(item.name)}: ${(item.score * 100).toFixed(1)}%</li>`).join("")}</ul></div>` : ""}
+    </section>`;
 }
-
 function assistantPage() {
   const messages = state.chatMessages.length ? state.chatMessages.map(message => `
     <article class="chat-bubble ${message.role === "user" ? "from-me" : "from-agent"}">
@@ -265,9 +275,20 @@ function publishPage() {
 }
 
 function labPage() {
-  return `${pageHeader("MODEL STUDIO / EXPERIMENTS", "Training & testing lab", "Experiment controls will connect to the training service when the ML pipeline is ready.", `<span class="lab-state"><i></i> PIPELINE NOT CONNECTED</span>`)}<div class="lab-layout"><section class="panel lab-config"><div class="panel-heading"><div><span class="section-kicker">EXPERIMENT SETUP</span><h3>Run configuration</h3></div><span class="form-step">01</span></div><label class="field-label">Model<select disabled><option>Select a model version</option></select></label><label class="field-label">Training dataset<div class="dataset-select"><span class="dataset-icon">${icon("file", 17)}</span><span><b>No dataset selected</b><small>Private training dataset storage</small></span><button type="button" data-action="choose-dataset">Browse</button></div></label><label class="field-label">Target column<input placeholder="Available after dataset validation" disabled/></label><div class="field-row"><label class="field-label">Validation split<select disabled><option>Choose a validation strategy</option></select></label><label class="field-label">Random seed<input type="number" placeholder="—" disabled/></label></div><div class="toggle-row"><span><b>Compare with baseline</b><small>Will be configured with the training service</small></span><button type="button" class="toggle" disabled><i></i></button></div><div class="toggle-row"><span><b>Stratified split</b><small>Will be configured with the training service</small></span><button type="button" class="toggle" disabled><i></i></button></div><button class="primary-button run-training" disabled>${icon("flask", 16)} Training service not connected</button><small class="demo-only">No training is simulated or started from this page.</small></section><section class="lab-results"><div class="panel experiment-panel"><div class="panel-heading"><div><span class="section-kicker">TRAINING RUNS</span><h3>Experiment history</h3></div><span class="live-status status-paused">${state.trainingRuns.length} runs</span></div>${state.trainingRuns.length ? state.trainingRuns.map(run => `<div class="registry-row"><span class="registry-mark registry-lilac">${icon("flask", 16)}</span><span><b>${escapeHtml(run.model_name || "Model training run")}</b><small>${escapeHtml(new Date(run.created_at).toLocaleString())}</small></span><span class="live-status ${run.status === "completed" ? "status-live" : "status-review"}">${escapeHtml(run.status)}</span></div>`).join("") : `<div class="run-illustration"><div class="run-atom"><i>✳</i></div><div><b>No training runs recorded</b><small>Runs and validation metrics will appear after a training backend is connected.</small></div></div><div class="experiment-steps"><span class="active-step"><i>1</i> Dataset</span><span><i>2</i> Configure</span><span><i>3</i> Results</span></div>`}</div><div class="panel lab-note"><span class="note-icon lavender">${icon("shield", 16)}</span><span><b>Keep experiments reproducible</b><small>Each run should retain its dataset version, target, split, seed, code version, and validation report.</small></span></div></section></div>`;
+  const sites = state.federation.sites || [];
+  const chexnet = (state.federation.models || []).find(model => model.id === "cxr-pneumo-cnn");
+  const runs = state.trainingRuns.map(run => { const last = run.metrics?.history?.at(-1) || run.metrics || {}; return `<div class="registry-row"><span class="registry-mark registry-lilac">${icon("flask", 16)}</span><span><b>${escapeHtml(run.model_name)}</b><small>${escapeHtml(new Date(run.created_at).toLocaleString())} · ${escapeHtml(run.configuration?.sites?.join(", ") || "")}</small></span><span class="live-status ${run.status === "completed" ? "status-live" : "status-review"}">${escapeHtml(run.status)}</span><small>${last.held_out_accuracy !== undefined ? `Held-out: ${(last.held_out_accuracy * 100).toFixed(1)}% (${last.held_out_samples} images)` : ""}${run.error_summary ? escapeHtml(run.error_summary) : ""}</small></div>`; }).join("");
+  return `${pageHeader("MODEL STUDIO / FEDERATION", "Training & testing lab", "Train a CheXNet classifier across explicitly labeled local sites using sample-weighted FedAvg.", `<span class="lab-state"><i></i> ${sites.length} LOCAL SITES</span>`)}
+    <div class="lab-layout"><section class="panel lab-config"><div class="panel-heading"><div><span class="section-kicker">REAL TRAINING</span><h3>Federated run</h3></div><span class="form-step">01</span></div>
+      <p>Each site keeps images and a labels.csv file on this machine. The coordinator averages model updates by the number of labeled samples. No synthetic metrics or patient uploads are used.</p>
+      <div class="notice-strip">${icon("shield", 16)} <span>Checkpoint: ${chexnet?.checkpoint_present ? "CheXNet update found" : "missing"} · Minimum two sites, four labeled images per site.</span></div>
+      <div class="panel-heading"><h3>Detected sites</h3><button class="subtle-link" data-action="refresh-lab">Refresh</button></div>
+      ${sites.length ? sites.map(site => `<div class="registry-row"><b>${escapeHtml(site.id)}</b><span class="live-status status-live">labels.csv found</span></div>`).join("") : `<div class="empty-activity"><b>No labeled sites found.</b><span>See the README for the local folder format.</span></div>`}
+      <form id="federated-form"><div class="field-row"><label class="field-label">Rounds<input name="rounds" type="number" min="1" max="10" value="1" required/></label><label class="field-label">Local epochs<input name="epochs" type="number" min="1" max="5" value="1" required/></label></div>
+        <button class="primary-button run-training" type="submit" ${sites.length < 2 || !chexnet?.available ? "disabled" : ""}>${icon("flask", 16)} Start real training</button></form>
+      <small class="demo-only">Training may take several minutes. A finished checkpoint remains experimental until independent validation.</small>
+    </section><section class="lab-results"><div class="panel experiment-panel"><div class="panel-heading"><div><span class="section-kicker">TRAINING RUNS</span><h3>Experiment history</h3></div><button class="subtle-link" data-action="refresh-lab">Refresh</button></div>${runs || `<div class="run-illustration"><b>No federated runs yet.</b></div>`}</div></section></div>`;
 }
-
 function accessPage() {
   const rows = state.adminProfiles.map(profile => `<tr><td><span class="person-cell"><i class="person-avatar">${escapeHtml((profile.full_name || profile.email || "U").split(/[\s.@_-]+/).filter(Boolean).slice(0,2).map(part=>part[0].toUpperCase()).join(""))}</i><span><b>${escapeHtml(profile.full_name || "Account")}</b><small>${escapeHtml(profile.email || "")}</small></span></span></td><td>${escapeHtml(profile.role)}</td><td>${escapeHtml(new Date(profile.created_at).toLocaleDateString())}</td><td><span class="live-status status-live">Active</span></td></tr>`).join("");
   const audit = state.trainingRuns.slice(0,4).map(event => `<div class="audit-event"><span class="audit-dot dot-purple"></span><span><b>${escapeHtml(event.event_type || "Training run updated")}</b><small>${escapeHtml(event.model_name || event.status || "Model workspace")}</small></span><time>${escapeHtml(new Date(event.created_at).toLocaleDateString())}</time></div>`).join("");
@@ -538,9 +559,13 @@ async function loadPageData(page) {
       const { messages } = await apiRequest("/api/chat/messages");
       state.chatMessages = messages || [];
     } else if (page === "patient/models") {
-      const { data, error } = await state.supabase.from("health_models").select("id,name,outcome,description,model_type,status,required_attributes,updated_at").eq("status", "published").order("updated_at", { ascending: false });
+      const [{ data, error }, local] = await Promise.all([
+        state.supabase.from("health_models").select("id,name,outcome,description,model_type,status,required_attributes,updated_at").eq("status", "published").order("updated_at", { ascending: false }),
+        apiRequest("/api/models/local"),
+      ]);
       if (error) throw error;
       state.models = data || [];
+      state.localModels = local.models || [];
     } else if (page === "patient/history") {
       const { data, error } = await state.supabase.from("assessments").select("id,model_id,model_name,status,risk_band,created_at").eq("owner_id", state.user.id).order("created_at", { ascending: false }).limit(100);
       if (error) throw error;
@@ -598,9 +623,13 @@ async function loadAdminData(page) {
     state.trainingRuns = events.data || [];
   }
   if (page === "admin/lab") {
-    const { data, error } = await state.supabase.from("training_runs").select("id,model_name,status,created_at").order("created_at", { ascending: false }).limit(25);
+    const [{ data, error }, federation] = await Promise.all([
+      state.supabase.from("training_runs").select("id,model_name,status,configuration,metrics,error_summary,created_at").order("created_at", { ascending: false }).limit(25),
+      apiRequest("/api/federation/status"),
+    ]);
     if (error) throw error;
     state.trainingRuns = data || [];
+    state.federation = federation;
   }
 }
 
@@ -696,6 +725,49 @@ async function sendChat(form) {
   }
 }
 
+async function predictLocalModel(form) {
+  const file = form.querySelector("#local-image")?.files?.[0];
+  if (!file) return;
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) {
+    toast("Choose a PNG, JPEG, or WebP chest X-ray under 10 MB.");
+    return;
+  }
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  button.textContent = "Analyzing image…";
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 32768) binary += String.fromCharCode(...bytes.subarray(offset, offset + 32768));
+    const result = await apiRequest("/api/models/local/predict", { method: "POST", body: {
+      modelId: "cxr-pneumo-cnn", fileName: file.name, image: { mimeType: file.type, data: btoa(binary) },
+    } });
+    if (!result.available) throw new Error(result.reason || "The model could not run.");
+    state.localResult = result.result;
+    render();
+  } catch (error) {
+    toast(friendlyDataError(error));
+    button.disabled = false;
+    button.textContent = "Analyze image";
+  }
+}
+
+async function startFederatedTraining(form) {
+  const values = new FormData(form);
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    await apiRequest("/api/federation/run", { method: "POST", body: {
+      rounds: Number(values.get("rounds")), epochs: Number(values.get("epochs")),
+    } });
+    toast("Federated training started. Refresh the lab to see its progress.");
+    await loadPageData("admin/lab");
+  } catch (error) {
+    toast(friendlyDataError(error));
+    button.disabled = false;
+  }
+}
+
 async function createModel(form) {
   if (!state.supabase || !state.profile || state.profile.role !== "admin") return;
   const values = new FormData(form);
@@ -786,6 +858,8 @@ document.addEventListener("click", async event => {
   if (action === "notifications") toast("There are no new notifications.");
   if (action === "privacy") toast("Your account and document access are governed by Supabase policies.");
   if (action === "retry-page") loadPageData(state.page);
+  if (action === "refresh-lab") loadPageData("admin/lab");
+  if (event.target.closest("[data-choose-local]")) $("#local-image")?.click();
   if (action === "choose-dataset") toast("Dataset upload will be added with the training pipeline.");
   if (action === "export-report") toast("Report export will be added after the reporting requirements are set.");
 });
@@ -808,11 +882,11 @@ document.addEventListener("input", event => {
   if (event.target.matches("#chat-form input[name=message]")) state.chatDraft = event.target.value;
   if (event.target.id === "model-search") {
     state.modelSearch = event.target.value;
-    const grid = $(".model-grid");
-    if (grid) {
-      const filtered = state.models.filter(model => `${model.name} ${model.outcome || ""} ${model.description || ""}`.toLowerCase().includes(state.modelSearch.toLowerCase()));
-      grid.innerHTML = filtered.map((model, index) => `<article class="model-tile"><div class="model-tile-top"><span class="model-art-icon ${["model-lilac","model-peach","model-mint"][index%3]}">${["◌","⌁","✳"][index%3]}</span><span class="model-status">${escapeHtml(model.status)}</span></div><span class="model-kind">${escapeHtml((model.outcome || model.model_type || "HEALTH MODEL").toUpperCase())}</span><h3>${escapeHtml(model.name)}</h3><p>${escapeHtml(model.description || "Model description has not been added yet.")}</p><div class="model-meta"><span>${icon("file", 14)} ${Array.isArray(model.required_attributes) ? model.required_attributes.length : 0} selected attributes</span><span>${icon("shield", 14)} Decision support</span></div><button class="outline-button" data-model-id="${escapeHtml(model.id)}">View model <span>${icon("arrow", 14)}</span></button></article>`).join("") || `<div class="panel empty-state"><span class="empty-state-icon">${icon("box", 19)}</span><b>${state.modelSearch ? "No matching models" : "No models published yet"}</b><span>${state.modelSearch ? "Try another search." : "Published health models will appear here when the admin adds them."}</span></div>`;
-    }
+    const cursor = event.target.selectionStart;
+    render();
+    const input = $("#model-search");
+    input?.focus();
+    input?.setSelectionRange(cursor, cursor);
   }
   if (event.target.id === "profile-search") {
     const query = event.target.value.toLowerCase();
@@ -825,6 +899,8 @@ document.addEventListener("submit", async event => {
   if (event.target.id === "login-form") await signIn(event.target);
   if (event.target.id === "publish-form") await createModel(event.target);
   if (event.target.id === "chat-form") await sendChat(event.target);
+  if (event.target.id === "local-predict-form") await predictLocalModel(event.target);
+  if (event.target.id === "federated-form") await startFederatedTraining(event.target);
 });
 
 window.addEventListener("hashchange", () => {

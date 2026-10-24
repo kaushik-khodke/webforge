@@ -19,10 +19,17 @@ backend/supabase/.env.*
 !backend/supabase/.env.example
 backend/supabase/seed.local.sql
 
-# Editor / operating system files
+# Local medical weights, private training cohorts, and generated checkpoints
+backend/ml/chexnet/models/
+backend/ml/chexnet/models/trained/
+backend/ml/CT-CLIP/models/trained/
+backend/ml/CMR-AI/checkpoints/trained/
+backend/ml/federated/sites/
+backend/ml/federated/artifacts/
+backend/ml/**/__pycache__/
+*.pyc
+
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
-
-backend/ml/chexnet/models/

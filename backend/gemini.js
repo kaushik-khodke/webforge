@@ -2,6 +2,16 @@ import { GoogleGenAI } from "@google/genai";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const model = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
+const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite";
+
+async function generateWithFallback(ai, request) {
+  try { return await ai.models.generateContent({ ...request, model }); }
+  catch (error) {
+    const message = String(error?.message || error);
+    if (fallbackModel === model || !/(404|429|500|502|503|504|not.found|resource.exhausted|quota|rate.limit|unavailable|overloaded)/i.test(message)) throw error;
+    return ai.models.generateContent({ ...request, model: fallbackModel });
+  }
+}
 
 export function geminiReady() { return Boolean(apiKey); }
 
@@ -11,8 +21,7 @@ function client() {
 }
 
 export async function extractVisualText(bytes, mimeType) {
-  const response = await client().models.generateContent({
-    model,
+  const response = await generateWithFallback(client(), {
     contents: [
       { text: "Extract all legible text from this health document. Preserve headings, dates, measurements, units, and table row relationships. Return only the extracted text. If nothing is legible, return exactly NO_READABLE_TEXT." },
       { inlineData: { mimeType, data: Buffer.from(bytes).toString("base64") } },
@@ -35,8 +44,7 @@ export async function generateAgentResponse({ instruction, history, question, im
   const usedTools = [];
 
   for (let turn = 0; turn < 4; turn += 1) {
-    const response = await ai.models.generateContent({
-      model,
+    const response = await generateWithFallback(ai, {
       contents,
       config: {
         systemInstruction: instruction,

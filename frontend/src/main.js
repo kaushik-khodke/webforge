@@ -214,7 +214,7 @@ function documentsPage() {
 function modelsPage() {
   const filtered = state.models.filter(model => `${model.name} ${model.outcome || ""} ${model.description || ""}`.toLowerCase().includes(state.modelSearch.toLowerCase()));
   const published = filtered.map(model => `<article class="model-tile"><div class="model-tile-top"><span class="model-art-icon model-lilac">◌</span><span class="model-status">${escapeHtml(model.status)}</span></div><span class="model-kind">${escapeHtml(model.model_type || "HEALTH MODEL")}</span><h3>${escapeHtml(model.name)}</h3><p>${escapeHtml(model.description || "No description provided.")}</p><span class="model-meta">Admin published model</span></article>`).join("");
-  const local = state.localModels.filter(model => `${model.name} ${model.task}`.toLowerCase().includes(state.modelSearch.toLowerCase())).map(model => `<article class="model-tile"><div class="model-tile-top"><span class="model-art-icon model-peach">✳</span><span class="model-status">${escapeHtml(model.status)}</span></div><span class="model-kind">LOCAL CHECKPOINT</span><h3>${escapeHtml(model.name)}</h3><p>${escapeHtml(model.description)}</p><div class="model-meta"><span>${escapeHtml(model.task)}</span></div>${model.available ? `<button class="outline-button" data-choose-local="${model.id}">Use this model ${icon("arrow", 14)}</button>` : `<small>${escapeHtml(model.reason)}</small>`}</article>`).join("");
+  const local = state.localModels.filter(model => `${model.name} ${model.task}`.toLowerCase().includes(state.modelSearch.toLowerCase())).map(model => `<article class="model-tile"><div class="model-tile-top"><span class="model-art-icon model-peach">✳</span><span class="model-status">${escapeHtml(model.status)}</span></div><span class="model-kind">LOCAL CHECKPOINT</span><h3>${escapeHtml(model.name)}</h3><p>${escapeHtml(model.description)}</p><div class="model-meta"><span>${escapeHtml(model.task)}${model.required_attributes?.length ? ` · Inputs: ${escapeHtml(model.required_attributes.join(", "))}` : ""}</span></div>${model.available ? `<button class="outline-button" data-choose-local="${model.id}">Use this model ${icon("arrow", 14)}</button>` : `<small>${escapeHtml(model.reason)}</small>`}</article>`).join("");
   const result = state.localResult;
   return `${pageHeader("MODEL LIBRARY", "Explore health models", "Review model status and run a local experimental checkpoint when available.", `<span class="collection-count">${state.models.length + state.localModels.length} MODELS</span>`)}
     <div class="section-row models-toolbar"><div><span class="section-kicker">AVAILABLE MODELS</span><h2>Choose a model</h2></div><label class="search-field">${icon("search", 16)}<input id="model-search" placeholder="Search models" value="${escapeHtml(state.modelSearch)}"/></label></div>
@@ -277,16 +277,17 @@ function publishPage() {
 function labPage() {
   const sites = state.federation.sites || [];
   const chexnet = (state.federation.models || []).find(model => model.id === "cxr-pneumo-cnn");
-  const runs = state.trainingRuns.map(run => { const last = run.metrics?.history?.at(-1) || run.metrics || {}; return `<div class="registry-row"><span class="registry-mark registry-lilac">${icon("flask", 16)}</span><span><b>${escapeHtml(run.model_name)}</b><small>${escapeHtml(new Date(run.created_at).toLocaleString())} · ${escapeHtml(run.configuration?.sites?.join(", ") || "")}</small></span><span class="live-status ${run.status === "completed" ? "status-live" : "status-review"}">${escapeHtml(run.status)}</span><small>${last.held_out_accuracy !== undefined ? `Held-out: ${(last.held_out_accuracy * 100).toFixed(1)}% (${last.held_out_samples} images)` : ""}${run.error_summary ? escapeHtml(run.error_summary) : ""}</small></div>`; }).join("");
+  const runs = state.trainingRuns.map(run => { const last = run.metrics?.history?.at(-1) || run.metrics || {}; return `<div class="registry-row"><span class="registry-mark registry-lilac">${icon("flask", 16)}</span><span><b>${escapeHtml(run.model_name)}</b><small>${escapeHtml(new Date(run.created_at).toLocaleString())} · ${escapeHtml(run.configuration?.sites?.join(", ") || "")}</small></span><span class="live-status ${run.status === "completed" ? "status-live" : "status-review"}">${escapeHtml(run.status)}</span><small>${last.held_out_accuracy !== undefined ? `Held-out: ${(last.held_out_accuracy * 100).toFixed(1)}% (${last.held_out_samples} images)` : ""}${run.error_summary ? escapeHtml(run.error_summary) : ""}</small>${run.status === "completed" && run.metrics?.filename && state.federation.active?.sha256 !== run.metrics.sha256 ? `<button class="outline-button" data-activate-run="${escapeHtml(run.id)}">Activate experimental checkpoint</button>` : ""}</div>`; }).join("");
   return `${pageHeader("MODEL STUDIO / FEDERATION", "Training & testing lab", "Train a CheXNet classifier across explicitly labeled local sites using sample-weighted FedAvg.", `<span class="lab-state"><i></i> ${sites.length} LOCAL SITES</span>`)}
     <div class="lab-layout"><section class="panel lab-config"><div class="panel-heading"><div><span class="section-kicker">REAL TRAINING</span><h3>Federated run</h3></div><span class="form-step">01</span></div>
       <p>Each site keeps images and a labels.csv file on this machine. The coordinator averages model updates by the number of labeled samples. No synthetic metrics or patient uploads are used.</p>
       <div class="notice-strip">${icon("shield", 16)} <span>Checkpoint: ${chexnet?.checkpoint_present ? "CheXNet update found" : "missing"} · Minimum two sites, four labeled images per site.</span></div>
+      <p>Active inference checkpoint: ${escapeHtml(state.federation.active?.filename || "original local CheXNet update")}</p>
       <div class="panel-heading"><h3>Detected sites</h3><button class="subtle-link" data-action="refresh-lab">Refresh</button></div>
       ${sites.length ? sites.map(site => `<div class="registry-row"><b>${escapeHtml(site.id)}</b><span class="live-status status-live">labels.csv found</span></div>`).join("") : `<div class="empty-activity"><b>No labeled sites found.</b><span>See the README for the local folder format.</span></div>`}
       <form id="federated-form"><div class="field-row"><label class="field-label">Rounds<input name="rounds" type="number" min="1" max="10" value="1" required/></label><label class="field-label">Local epochs<input name="epochs" type="number" min="1" max="5" value="1" required/></label></div>
         <button class="primary-button run-training" type="submit" ${sites.length < 2 || !chexnet?.available ? "disabled" : ""}>${icon("flask", 16)} Start real training</button></form>
-      <small class="demo-only">Training may take several minutes. A finished checkpoint remains experimental until independent validation.</small>
+      <small class="demo-only">Training may take several minutes. Review the held-out result before activating a checkpoint. Activation remains experimental and is not clinical validation.</small>
     </section><section class="lab-results"><div class="panel experiment-panel"><div class="panel-heading"><div><span class="section-kicker">TRAINING RUNS</span><h3>Experiment history</h3></div><button class="subtle-link" data-action="refresh-lab">Refresh</button></div>${runs || `<div class="run-illustration"><b>No federated runs yet.</b></div>`}</div></section></div>`;
 }
 function accessPage() {
@@ -859,6 +860,12 @@ document.addEventListener("click", async event => {
   if (action === "privacy") toast("Your account and document access are governed by Supabase policies.");
   if (action === "retry-page") loadPageData(state.page);
   if (action === "refresh-lab") loadPageData("admin/lab");
+  const activateRun = event.target.closest("[data-activate-run]");
+  if (activateRun) {
+    try { await apiRequest("/api/federation/activate", { method: "POST", body: { runId: activateRun.dataset.activateRun } }); toast("Experimental checkpoint activated."); await loadPageData("admin/lab"); }
+    catch (error) { toast(friendlyDataError(error)); }
+    return;
+  }
   if (event.target.closest("[data-choose-local]")) $("#local-image")?.click();
   if (action === "choose-dataset") toast("Dataset upload will be added with the training pipeline.");
   if (action === "export-report") toast("Report export will be added after the reporting requirements are set.");

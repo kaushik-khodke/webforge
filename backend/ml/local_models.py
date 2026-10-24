@@ -22,6 +22,9 @@ CHECKPOINTS = {
     "cxr-pneumo-cnn": ROOT / "chexnet/models/trained/chexnet_update_hosp-001_1790766306.pth.tar",
     "ct-clip-3d": ROOT / "CT-CLIP/models/trained/ctclip_update_hosp-002_1790766307.pt",
     "cmr-ai-vst": ROOT / "CMR-AI/checkpoints/trained/cmrai_update_hosp-003_1790766371.pth",
+    "cardiovascular_vqc": ROOT.parent / "qml/cardiovascular_vqc/best_model.pt",
+    "diabetes_vqc": ROOT.parent / "qml/diabetes_vqc/best_model.pt",
+    "pulmonary_vqc": ROOT.parent / "qml/pulmonary_vqc/best_model.pt",
 }
 CLASSES = ["Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass", "Nodule",
            "Pneumonia", "Pneumothorax", "Consolidation", "Edema", "Emphysema",
@@ -35,22 +38,27 @@ def catalog():
         ("cxr-pneumo-cnn", "CheXNet", "14 chest X-ray findings"),
         ("ct-clip-3d", "CT-CLIP", "Chest CT findings"),
         ("cmr-ai-vst", "CMR-AI", "Cardiac MRI findings"),
+        ("cardiovascular_vqc", "Cardiovascular VQC", "Cardiovascular classification"),
+        ("diabetes_vqc", "Diabetes VQC", "Diabetes classification"),
+        ("pulmonary_vqc", "Pulmonary VQC", "Pulmonary classification"),
     ]:
         path = CHECKPOINTS[slug]
         ready = slug == "cxr-pneumo-cnn" and path.is_file()
+        quantum = slug.endswith("_vqc")
         models.append({"id": slug, "name": name, "task": task, "checkpoint_present": path.is_file(),
-                       "available": ready, "input_modality": "image" if ready else "medical_volume",
-                       "status": "local experimental" if ready else "foundation checkpoint missing",
+                       "available": ready, "input_modality": "tabular" if quantum else "image" if ready else "medical_volume",
+                       "status": "local experimental" if ready else "runtime code needed" if quantum and path.is_file() else "foundation checkpoint missing",
                        "reason": None if ready else ("Local checkpoint is missing." if not path.is_file()
+                           else "The matching QML runtime code is missing." if quantum
                            else "Only an update/head file is present; the full foundation checkpoint is required."),
                        "source": path.name})
     return models
 
 
 def active_checkpoint():
-    latest = FEDERATED_DIR / "latest.json"
-    if latest.is_file():
-        metadata = json.loads(latest.read_text(encoding="utf-8"))
+    approved = FEDERATED_DIR / "active.json"
+    if approved.is_file():
+        metadata = json.loads(approved.read_text(encoding="utf-8"))
         path = FEDERATED_DIR / metadata["filename"]
         if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == metadata["sha256"]:
             return path, metadata

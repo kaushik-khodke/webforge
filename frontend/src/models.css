@@ -9,3 +9,5 @@
 .local-result ul{margin:12px 0 0;padding-left:22px;line-height:1.8;font-size:var(--text-body)}
 .lab-config form{margin-top:22px}
 .lab-config .registry-row{justify-content:space-between}
+.experiment-panel .registry-row{flex-wrap:wrap;gap:12px}
+.experiment-panel .registry-row>.outline-button{margin-left:auto}

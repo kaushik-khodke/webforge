@@ -1,26 +1,35 @@
 import { spawn } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const script = path.join(here, "ml", "local_models.py");
 const dataRoot = path.resolve(process.env.FL_DATA_ROOT || path.join(here, "ml", "federated", "sites"));
+const artifactDir = path.join(here, "ml", "federated", "artifacts");
 const specs = [
   { id: "cxr-pneumo-cnn", name: "CheXNet", task: "14 chest X-ray findings", file: "chexnet/models/trained/chexnet_update_hosp-001_1790766306.pth.tar", description: "Experimental chest X-ray classifier. Scores are not a diagnosis or a clinically validated risk estimate." },
   { id: "ct-clip-3d", name: "CT-CLIP", task: "Chest CT findings", file: "CT-CLIP/models/trained/ctclip_update_hosp-002_1790766307.pt", description: "A CT adapter update is present, but the complete foundation weights are missing." },
   { id: "cmr-ai-vst", name: "CMR-AI", task: "Cardiac MRI findings", file: "CMR-AI/checkpoints/trained/cmrai_update_hosp-003_1790766371.pth", description: "An MRI head update is present, but the complete foundation weights are missing." },
+  { id: "cardiovascular_vqc", name: "Cardiovascular VQC", task: "Cardiovascular classification", file: "../qml/cardiovascular_vqc/best_model.pt", description: "The QML checkpoint is present. Its matching TorchLayer circuit implementation is needed before inference.", features: ["age", "trestbps", "chol", "thalach", "oldpeak", "cp"] },
+  { id: "diabetes_vqc", name: "Diabetes VQC", task: "Diabetes classification", file: "../qml/diabetes_vqc/best_model.pt", description: "The QML checkpoint is present. Its matching TorchLayer circuit implementation is needed before inference.", features: ["glucose", "blood_pressure", "bmi", "age", "insulin", "diabetes_pedigree"] },
+  { id: "pulmonary_vqc", name: "Pulmonary VQC", task: "Pulmonary classification", file: "../qml/pulmonary_vqc/best_model.pt", description: "The QML checkpoint is present. Its matching TorchLayer circuit implementation is needed before inference.", features: ["spo2", "respiratory_rate", "heart_rate", "temperature_f", "systolic_bp", "age"] },
 ];
 
 export function localCatalog() {
   return specs.map(spec => {
     const checkpointPresent = existsSync(path.join(here, "ml", spec.file));
     const available = spec.id === "cxr-pneumo-cnn" && checkpointPresent;
+    const quantum = Boolean(spec.features);
     return { id: spec.id, name: spec.name, task: spec.task, description: spec.description,
       checkpoint_present: checkpointPresent, available, local: true,
-      status: available ? "local experimental" : "foundation checkpoint missing",
-      reason: available ? null : checkpointPresent ? "Only a partial update is present." : "Local checkpoint is missing.",
-      input_modality: "image", model_type: "image_classification", required_attributes: [] };
+      status: available ? "local experimental" : quantum && checkpointPresent ? "runtime code needed" : "foundation checkpoint missing",
+      reason: available ? null : !checkpointPresent ? "Local checkpoint is missing." : quantum
+        ? "The matching QML circuit and preprocessing implementation was not included with this checkpoint."
+        : "Only a partial update is present; full foundation weights are required.",
+      input_modality: quantum ? "tabular" : "image", model_type: quantum ? "qml" : "image_classification",
+      required_attributes: spec.features || [] };
   });
 }
 
@@ -30,6 +39,24 @@ export function localSites() {
     const manifest = path.join(dataRoot, item.name, "labels.csv");
     return { id: item.name, manifest_present: existsSync(manifest) };
   }).filter(item => item.manifest_present);
+}
+
+export function activeFederated() {
+  const file = path.join(artifactDir, "active.json");
+  return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
+}
+
+export function activateFederated(metadata) {
+  if (!/^chexnet-fedavg-\d+\.pth\.tar$/.test(metadata?.filename || "") ||
+      !/^[a-f0-9]{64}$/i.test(metadata?.sha256 || "")) throw new Error("This run has no valid checkpoint artifact.");
+  const file = path.join(artifactDir, metadata.filename);
+  if (!existsSync(file)) throw new Error("The checkpoint file is missing on this server.");
+  const digest = createHash("sha256").update(readFileSync(file)).digest("hex");
+  if (digest !== metadata.sha256) throw new Error("Checkpoint hash verification failed.");
+  const temp = path.join(artifactDir, "active.tmp");
+  writeFileSync(temp, JSON.stringify(metadata, null, 2));
+  renameSync(temp, path.join(artifactDir, "active.json"));
+  return metadata;
 }
 
 export function runPython(command, payload, { timeout = 120_000, onEvent } = {}) {

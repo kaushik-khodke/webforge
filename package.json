@@ -7,6 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "test": "node --test frontend/tests/auth.test.js",
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0"

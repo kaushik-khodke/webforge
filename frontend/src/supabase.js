@@ -38,3 +38,25 @@ export function getAuthRedirectUrl() {
   const { redirectPath } = getSupabaseConfig();
   return new URL(redirectPath, window.location.origin).toString();
 }
+
+export async function registerPatient(credentials) {
+  const client = await getSupabase();
+  const { url, anonKey } = getSupabaseConfig();
+  const response = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: anonKey } });
+  if (!response.ok) throw new Error("Could not check account settings. Please try again.");
+  const settings = await response.json();
+  if (!settings.mailer_autoconfirm) return client.auth.signUp(credentials);
+
+  // Immediate email registration does not use a PKCE email callback. Keep
+  // OAuth's main client on PKCE and transfer the new session to that client.
+  const { createClient } = await import("@supabase/supabase-js");
+  const registration = createClient(url, anonKey, {
+    auth: { flowType: "implicit", persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "luma-patient-registration" },
+  });
+  const result = await registration.auth.signUp(credentials);
+  if (result.error || !result.data?.session) return result;
+  return client.auth.setSession({
+    access_token: result.data.session.access_token,
+    refresh_token: result.data.session.refresh_token,
+  });
+}

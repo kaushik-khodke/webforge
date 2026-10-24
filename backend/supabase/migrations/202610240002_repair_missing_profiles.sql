@@ -46,3 +46,5 @@ $$;
 revoke all on function public.ensure_my_profile() from public;
 revoke all on function public.ensure_my_profile() from anon;
 grant execute on function public.ensure_my_profile() to authenticated;
+
+notify pgrst, 'reload schema';

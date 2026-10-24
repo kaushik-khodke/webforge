@@ -1,4 +1,7 @@
-import { getAuthRedirectUrl, getSupabase, getSupabaseConfig, isSupabaseConfigured } from "./supabase.js";
+import { getAuthRedirectUrl, getSupabase, getSupabaseConfig, isSupabaseConfigured, registerPatient } from "./supabase.js";
+import { signInOrCreatePatient } from "./auth.js";
+
+let manualAuthInProgress = false;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -12,6 +15,8 @@ const state = {
   authReady: false,
   authBusy: false,
   authError: "",
+  authEmail: "",
+  authNotice: "",
   pageBusy: false,
   pageError: "",
   toast: "",
@@ -96,8 +101,8 @@ function loginPage() {
   const configReady = isSupabaseConfigured();
   const adminMode = state.roleChoice === "admin";
   const mode = state.authMode;
-  const title = mode === "signup" ? "Create your account." : mode === "reset" ? "Reset your password." : "Good to see you.";
-  const buttonLabel = mode === "signup" ? "Create patient account" : mode === "reset" ? "Send reset link" : adminMode ? "Admin sign in" : "Sign in to Luma";
+  const title = mode === "reset" ? "Reset your password." : "Good to see you.";
+  const buttonLabel = mode === "reset" ? "Send reset link" : adminMode ? "Admin sign in" : "Continue to Luma";
   return `<main class="public-experience">
     <section class="landing-screen" id="landing-screen" aria-label="Luma introduction">
     <header class="public-nav">${brand()}<a class="nav-signin" href="#auth-screen" data-scroll-auth>Sign in <span>${icon("arrow", 15)}</span></a></header>
@@ -109,18 +114,19 @@ function loginPage() {
     </section>
     <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
     <header class="auth-nav">${brand()}<button type="button" class="back-to-landing" data-scroll-home>${icon("arrow", 15)} Back to introduction</button></header>
-    <div class="auth-dock"><div class="auth-intro"><span class="auth-kicker">${mode === "reset" ? "ACCOUNT ACCESS" : adminMode ? "LUMA ADMIN STUDIO" : "WELCOME TO LUMA"}</span><h2 id="auth-title">${title}</h2><p>${mode === "signup" ? "Create a patient account to continue." : mode === "reset" ? "We’ll email you a secure reset link." : adminMode ? "Sign in with your authorized workspace account." : "Sign in to continue to your health space."}</p><div class="auth-security-note">${icon("shield", 14)} Supabase-secured account access</div></div>
+    <div class="auth-dock"><div class="auth-intro"><span class="auth-kicker">${mode === "reset" ? "ACCOUNT ACCESS" : adminMode ? "LUMA ADMIN STUDIO" : "WELCOME TO LUMA"}</span><h2 id="auth-title">${title}</h2><p>${mode === "reset" ? "We’ll email you a secure reset link." : adminMode ? "Sign in with your authorized workspace account." : "Sign in to your health space. If you’re new, we’ll create your patient account automatically."}</p><div class="auth-security-note">${icon("shield", 14)} Supabase-secured account access</div></div>
     <form class="login-form" id="login-form" data-mode="${mode}">
-      <div class="auth-error" id="auth-error" ${state.authError ? "" : "hidden"}>${escapeHtml(state.authError)}</div>
-      <label class="auth-field">Email address<div class="input-wrap"><span>${icon("users", 17)}</span><input name="email" type="email" placeholder="you@example.com" autocomplete="email" required value="${adminMode ? escapeHtml(getSupabaseConfig().adminEmail) : ""}"/></div></label>
-      ${mode === "reset" ? "" : `<label class="auth-field">Password<div class="input-wrap"><span>${icon("shield", 17)}</span><input name="password" type="password" placeholder="${mode === "signup" ? "At least 8 characters" : "Enter your password"}" autocomplete="${mode === "signup" ? "new-password" : "current-password"}" required minlength="${mode === "signup" ? "8" : "1"}"/><button class="show-password" type="button" data-action="show-password">Show</button></div></label>`}
+      <div class="auth-error" id="auth-error" role="alert" ${state.authError ? "" : "hidden"}>${escapeHtml(state.authError)}</div>
+      ${state.authNotice ? `<p role="status">${escapeHtml(state.authNotice)}</p>` : ""}
+      <label class="auth-field">Email address<div class="input-wrap"><span>${icon("users", 17)}</span><input name="email" type="email" placeholder="you@example.com" autocomplete="email" required value="${escapeHtml(adminMode ? getSupabaseConfig().adminEmail : state.authEmail)}"/></div></label>
+      ${mode === "reset" ? "" : `<label class="auth-field">Password<div class="input-wrap"><span>${icon("shield", 17)}</span><input name="password" type="password" placeholder="${adminMode ? "Enter your password" : "Your password (8+ characters for a new account)"}" autocomplete="current-password" required minlength="1"/><button class="show-password" type="button" data-action="show-password">Show</button></div></label>`}
       ${mode === "signin" ? `<div class="form-options"><span class="remember">Your session is securely managed by Supabase.</span><button class="text-button" type="button" data-action="forgot">Forgot password?</button></div>` : ""}
       ${mode === "signin" ? `<div class="role-picker"><span>Continue as</span><div><button type="button" data-role="patient" class="${!adminMode ? "selected" : ""}">${icon("heart", 15)} Patient</button><button type="button" data-role="admin" class="${adminMode ? "selected" : ""}">${icon("settings", 15)} Admin</button></div></div>` : ""}
-      <button class="primary-button sign-in-button" type="submit" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? '<span class="spinner"></span> Connecting…' : `${buttonLabel}<span>${icon("arrow", 17)}</span>`}</button>
+      <button class="primary-button sign-in-button" type="submit" ${state.authBusy || !state.authReady ? "disabled" : ""}>${state.authBusy ? '<span class="spinner"></span> Connecting…' : `${buttonLabel}<span>${icon("arrow", 17)}</span>`}</button>
       ${mode === "signin" && !adminMode ? `<div class="oauth-divider"><span></span> or continue with <span></span></div><div class="oauth-buttons"><button type="button" data-oauth="google" ${state.authBusy ? "disabled" : ""}><b class="google-g">G</b> Google</button><button type="button" data-oauth="github"><b class="github-mark">●</b> GitHub</button></div>` : ""}
       <div class="auth-config ${configReady ? "configured" : "not-configured"}">${configReady ? `${icon("check", 13)} Supabase project connected` : `${icon("info", 13)} Add Supabase URL and anon key in .env to enable sign-in`}</div>
     </form>
-    <div class="auth-foot">${mode === "signin" ? (adminMode ? `Admin account · ${escapeHtml(getSupabaseConfig().adminEmail)}` : `New to Luma? <button data-action="signup" class="text-button">Create a patient account</button>`) : `<button data-action="back-to-login" class="text-button">Back to sign in</button>`}<span class="auth-lock">${icon("shield", 13)} Secure sign-in</span></div></section>
+    <div class="auth-foot">${mode === "signin" ? (adminMode ? `Admin account · ${escapeHtml(getSupabaseConfig().adminEmail)}` : `One form to sign in or create your patient account.`) : `<button data-action="back-to-login" class="text-button">Back to sign in</button>`}<span class="auth-lock">${icon("shield", 13)} Secure sign-in</span></div></section>
     <footer class="public-footer"><span>© 2026 Luma Health Studio</span><span>Made with care <span class="footer-heart">♥</span></span></footer>
   </main>`;
 }
@@ -312,7 +318,8 @@ async function loadProfile(user) {
   if (!data) {
     const { error: repairError } = await state.supabase.rpc("ensure_my_profile");
     if (repairError) {
-      throw new Error(`Your sign-in succeeded, but your profile is missing. Apply backend/supabase/migrations/202610240002_repair_missing_profiles.sql in Supabase, then sign in again. (${repairError.message})`);
+      console.error("Profile repair failed", repairError.code);
+      throw new Error("We couldn’t prepare your account. Please try again or contact the workspace administrator.");
     }
     ({ data, error } = await state.supabase.from("profiles").select(profileFields).eq("id", user.id).maybeSingle());
     if (error) throw error;
@@ -362,6 +369,7 @@ async function applySession(user, roleHint) {
     state.page = "login";
     location.hash = "/";
     render();
+    $("#auth-screen")?.scrollIntoView({ block: "start" });
   }
 }
 
@@ -383,7 +391,8 @@ async function initializeAuth() {
       render();
     }
     state.supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "INITIAL_SESSION") return;
+      if (event === "INITIAL_SESSION" || manualAuthInProgress) return;
+      if (session?.user.id === state.user?.id && state.profile && ["SIGNED_IN", "TOKEN_REFRESHED"].includes(event)) return;
       window.setTimeout(() => applySession(session?.user || null), 0);
     });
   } catch (error) {
@@ -395,31 +404,24 @@ async function initializeAuth() {
 }
 
 async function signIn(form) {
+  if (state.authBusy || !state.authReady) return;
   const values = new FormData(form);
   const email = String(values.get("email") || "").trim().toLowerCase();
   const password = String(values.get("password") || "");
   const mode = form.dataset.mode;
+  const role = state.roleChoice;
+  state.authEmail = email;
   state.authError = "";
+  state.authNotice = "";
   if (!isSupabaseConfigured()) {
     setAuthError("Supabase is not configured yet. Add the project URL and anon key to .env, then restart the app.");
     return;
   }
   state.authBusy = true;
+  manualAuthInProgress = true;
   render();
   try {
     state.supabase = await getSupabase();
-    if (mode === "signup") {
-      if (state.roleChoice === "admin") throw new Error("Admin accounts are provisioned by the workspace owner; public sign-up is for patients.");
-      const { data, error } = await state.supabase.auth.signUp({ email, password, options: { emailRedirectTo: getAuthRedirectUrl() } });
-      if (error) throw error;
-      if (data.session?.user) await applySession(data.session.user, "patient");
-      else {
-        state.authBusy = false;
-        render();
-        toast("Check your email to confirm your account, then sign in.");
-      }
-      return;
-    }
     if (mode === "reset") {
       const { error } = await state.supabase.auth.resetPasswordForEmail(email, { redirectTo: getAuthRedirectUrl() });
       if (error) throw error;
@@ -429,15 +431,23 @@ async function signIn(form) {
       toast("If the account exists, a password reset email has been sent.");
       return;
     }
-    if (state.roleChoice === "admin" && email !== getSupabaseConfig().adminEmail) throw new Error("Use the configured workspace administrator email.");
-    const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    if (!data.user) throw new Error("Sign-in did not return an account.");
-    await applySession(data.user, state.roleChoice);
+    const result = await signInOrCreatePatient(state.supabase.auth, {
+      email, password, role, adminEmail: getSupabaseConfig().adminEmail, redirectTo: getAuthRedirectUrl(),
+    }, registerPatient);
+    if (result.requiresConfirmation) {
+      state.authBusy = false;
+      state.authNotice = "Check your email to confirm your account, then return here to sign in.";
+      render();
+      return;
+    }
+    await applySession(result.session.user, role);
   } catch (error) {
     state.authBusy = false;
     state.authError = friendlyAuthError(error);
     render();
+  } finally {
+    manualAuthInProgress = false;
+    if (!state.profile) $("#auth-screen")?.scrollIntoView({ block: "start" });
   }
 }
 
@@ -445,11 +455,13 @@ function friendlyAuthError(error) {
   const message = String(error?.message || "Sign-in could not be completed.");
   if (/invalid login credentials/i.test(message)) return "Email or password is incorrect.";
   if (/email not confirmed/i.test(message)) return "Confirm your email before signing in.";
+  if (/email logins are disabled|email provider is disabled/i.test(message)) return "Email sign-in is currently unavailable. Continue with Google or ask the workspace administrator to enable email sign-in.";
   if (/failed to fetch|network/i.test(message)) return "Could not reach Supabase. Check the project URL and network connection.";
   return message;
 }
 
 async function startOAuth(provider) {
+  if (state.authBusy || !state.authReady) return;
   if (state.roleChoice !== "patient") {
     toast("Social sign-in is for patient accounts. Use the admin email and password for the admin portal.");
     return;
@@ -478,6 +490,8 @@ async function signOut() {
   state.profile = null;
   state.page = "login";
   state.authError = "";
+  state.authEmail = "";
+  state.authNotice = "";
   location.hash = "/";
   render();
 }
@@ -680,8 +694,10 @@ document.addEventListener("click", async event => {
   if (routeButton) { route(routeButton.dataset.route); return; }
   const roleButton = event.target.closest("[data-role]");
   if (roleButton) {
+    if (state.authBusy) return;
     state.roleChoice = roleButton.dataset.role;
     state.authError = "";
+    state.authNotice = "";
     render();
     return;
   }
@@ -690,9 +706,8 @@ document.addEventListener("click", async event => {
   const action = event.target.closest("[data-action]")?.dataset.action;
   if (action === "choose-document") $("#document-input")?.click();
   if (action === "show-password") { const input = $("input[name=password]"); input.type = input.type === "password" ? "text" : "password"; event.target.textContent = input.type === "password" ? "Show" : "Hide"; }
-  if (action === "forgot") { state.authMode = "reset"; state.authError = ""; render(); }
-  if (action === "signup") { state.authMode = "signup"; state.roleChoice = "patient"; state.authError = ""; render(); }
-  if (action === "back-to-login") { state.authMode = "signin"; state.authError = ""; render(); }
+  if (action === "forgot" && !state.authBusy) { state.authMode = "reset"; state.authError = ""; state.authNotice = ""; render(); }
+  if (action === "back-to-login" && !state.authBusy) { state.authMode = "signin"; state.authError = ""; state.authNotice = ""; render(); }
   if (action === "logout") await signOut();
   if (action === "open-menu") { state.mobileMenu = true; render(); }
   if (action === "close-menu") { state.mobileMenu = false; render(); }

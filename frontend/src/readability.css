@@ -1,0 +1,170 @@
+/* Shared type scale for public, patient, and admin pages. Rem units respect
+   browser font preferences; compact screens retain readable body text. */
+:root {
+  --text-caption: .75rem;
+  --text-small: .875rem;
+  --text-body: 1rem;
+  --text-emphasis: 1.125rem;
+  --text-lead: 1.25rem;
+  --text-title: 1.5rem;
+  --text-heading: 1.75rem;
+  --text-section: 1.875rem;
+  --text-display: 2.125rem;
+  --text-hero: 2.5rem;
+  --sidebar-width: 300px;
+  font-size: 100%;
+  line-height: 1.55;
+}
+
+body { font-size: var(--text-body); }
+h1, h2, h3 { line-height: 1.25; }
+.page-heading h1 { font-size: clamp(2rem, 2.2vw + .5rem, 2.75rem); }
+.page-heading p, .welcome-copy p, .admin-welcome p,
+.model-intro-banner p, .history-summary p, .chat-bubble > div,
+.privacy-panel p, .assistant-unavailable > span { font-size: var(--text-body); line-height: 1.65; }
+.feature-desc, .model-tile p, .help-card p,
+.empty-activity > div:nth-child(2) span, .empty-history > span,
+.prompt-card small, .agent-boundary small, .publish-preview-card p,
+.form-section-title p, .field-hint, .artifact-note, .artifact-drop small,
+.dataset-select small, .toggle-row small, .lab-note span small,
+.result-banner, .experiment-steps span, .model-meta span,
+.document-name small, .person-cell span small, .registry-row small,
+.audit-event small, .workspace-pill small, .profile-row small,
+.auth-security-note, .auth-config, .auth-lock, .chat-disclaimer {
+  font-size: var(--text-small);
+  line-height: 1.6;
+}
+.document-name b, .table-model b, .person-cell span b,
+.registry-row b, .audit-event b, .dataset-select b, .toggle-row b,
+.agent-boundary b, .prompt-card b, .field-label, .empty-activity b,
+.profile-row b { font-size: var(--text-body); }
+.feature-title, .model-tile h3, .panel-heading h3,
+.form-section-title h3, .outcome-panel h3, .publish-preview-card h3,
+.empty-state b, .empty-documents > b, .empty-history > b {
+  font-size: var(--text-lead);
+  line-height: 1.35;
+}
+.section-kicker, .nav-section, .page-kicker { line-height: 1.5; }
+.doc-status, .model-status, .availability, .lab-state,
+.collection-count, .live-status { font-size: var(--text-small); }
+
+/* Allow the layout to grow with text instead of scaling the entire page. */
+.sidebar { width: var(--sidebar-width); }
+.app-main { margin-left: var(--sidebar-width); width: calc(100% - var(--sidebar-width)); min-width: 0; }
+.sidebar-brand { height: 44px; flex-shrink: 0; }
+.side-nav { min-height: 0; }
+.side-link { min-height: 48px; line-height: 1.4; }
+.workspace-pill b, .workspace-pill small { white-space: normal; }
+.workspace-pill { flex-shrink: 0; }
+.profile-row > span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
+.help-card p { max-width: none; }
+.logout-link { min-height: 44px; }
+.crumbs { flex-wrap: wrap; min-width: 0; font-size: var(--text-small); }
+.app-topbar { min-height: 76px; height: auto; padding-top: 12px; padding-bottom: 12px; gap: 16px; }
+.topbar-actions { flex-shrink: 0; }
+.auth-chip { max-width: 250px; overflow-wrap: anywhere; letter-spacing: 0; }
+.content-inner, .welcome-copy, .panel, .publish-form, .lab-config,
+.experiment-panel, .field-label, .field-row > *, .login-form { min-width: 0; }
+.page-heading { flex-wrap: wrap; }
+.page-heading p { max-width: 72ch; }
+.welcome-copy p { max-width: 48ch; }
+.welcome-copy { max-width: 62%; }
+.welcome-label, .welcome-label > *, .model-meta, .form-options,
+.auth-foot, .role-picker, .panel-heading, .section-row, .model-tile-top,
+.report-filter, .publish-actions { flex-wrap: wrap; }
+.welcome-label { row-gap: 8px; }
+.welcome-banner, .admin-welcome { min-height: 280px; }
+.feature-grid, .model-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.feature-card:last-child { grid-column: auto; }
+.feature-card { min-height: 220px; }
+.feature-title, .feature-desc, .model-tile h3, .document-name,
+.person-cell, .registry-row { overflow-wrap: anywhere; }
+.feature-desc { max-width: 48ch; }
+.feature-foot { margin-top: 20px; }
+.model-intro-banner { height: auto; min-height: 180px; padding-top: 24px; padding-bottom: 24px; }
+.model-intro-banner > div:nth-child(2) { min-width: 0; }
+.preview-label { position: static; align-self: flex-start; margin-left: auto; }
+.history-summary { height: auto; }
+.model-tile { min-height: 300px; }
+.primary-button, .outline-button, .light-button, .oauth-buttons button,
+.role-picker button { min-height: 44px; line-height: 1.4; }
+.compact { white-space: normal; }
+.search-field, .access-table .panel-heading .search-field { height: auto; min-height: 46px; }
+.search-field { max-width: 100%; }
+.search-field input { min-width: 0; width: 100%; }
+.input-wrap { height: auto; min-height: 54px; }
+.input-wrap input, .search-field input, .chat-composer input,
+.field-label input, .field-label select, .field-label textarea { font-size: var(--text-body); }
+.field-label input, .field-label select, .field-label textarea { min-height: 48px; line-height: 1.5; }
+.field-label textarea { min-height: 120px; }
+.sign-in-button { height: auto; min-height: 54px; }
+.form-options, .role-picker { gap: 12px; }
+.auth-foot { gap: 12px; }
+.login-form > [role="status"] { grid-column: 1 / -1; }
+.auth-intro p, .hero-lede { font-size: var(--text-emphasis); }
+.float-note { max-width: 88%; }
+.float-note b { font-size: var(--text-small); }
+.float-note small { font-size: var(--text-caption); }
+.table-scroll { overflow-x: auto; }
+table { min-width: 640px; }
+th { font-size: var(--text-small); line-height: 1.5; }
+td { font-size: var(--text-body); line-height: 1.55; }
+th, td { padding-top: 16px; padding-bottom: 16px; }
+.registry-row b, .registry-row small { white-space: normal; }
+.count-badge, .form-step, .experiment-steps span i { height: auto; min-height: 26px; min-width: 26px; }
+.chart-area { grid-template-columns: 40px 1fr; }
+.large-chart { grid-template-columns: 42px 1fr; }
+.bar-col small { height: auto; min-height: 20px; }
+.preview-fake-button { height: auto; min-height: 44px; }
+.app-footer, .public-footer { flex-wrap: wrap; gap: 10px; }
+
+/* Keep the primary navigation visible on laptop-height screens. */
+@media (max-height: 850px) {
+  .sidebar-bottom .help-card { display: none; }
+  .workspace-pill { margin-top: 20px; margin-bottom: 8px; }
+  .nav-section { padding-top: 12px; }
+}
+
+@media (max-width: 1100px) {
+  :root { --sidebar-width: 268px; }
+  .login-form { grid-template-columns: 1fr; }
+  .dashboard-bottom, .admin-dashboard-grid, .report-layout { grid-template-columns: 1fr; }
+  .auth-dock { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); }
+  .assistant-layout, .publish-layout, .lab-layout { grid-template-columns: 1fr; }
+  .admin-welcome > div:first-child { max-width: 66%; }
+}
+
+@media (max-width: 800px) {
+  .sidebar { width: min(320px, 88vw); }
+  .app-main { margin-left: 0; width: 100%; }
+  .app-topbar { min-height: 68px; }
+  .auth-chip { max-width: 120px; }
+  .auth-dock { grid-template-columns: 1fr; }
+  .auth-intro h2 { font-size: 2.125rem; }
+  .auth-intro p { font-size: var(--text-body); }
+  .welcome-copy { max-width: 72%; }
+  .welcome-banner, .admin-welcome { min-height: 300px; }
+}
+
+@media (max-width: 560px) {
+  .page-heading h1 { font-size: 2rem; }
+  .welcome-copy { max-width: 100%; }
+  .welcome-copy p { max-width: 100%; }
+  .welcome-copy h2 { font-size: 1.875rem; }
+  .snapshot-art, .admin-visual { display: none; }
+  .admin-welcome > div:first-child { max-width: 100%; }
+  .model-intro-art { display: none; }
+  .model-intro-banner { flex-wrap: wrap; gap: 12px; }
+  .model-intro-banner p, .history-summary p { max-width: none; }
+  .model-intro-banner h2 { font-size: 1.5rem; }
+  .preview-label { width: 100%; margin: 0; }
+  .field-row { grid-template-columns: 1fr; }
+  .report-metric-grid, .metric-grid, .result-metrics { grid-template-columns: 1fr; }
+  .history-illustration { display: none; }
+  .section-row > .subtle-link { white-space: normal; font-size: var(--text-small); }
+  .landing-bottom { grid-template-columns: 1fr auto; min-height: 70px; height: auto; }
+  .landing-bottom > span:last-child { display: none; }
+  .back-to-landing { font-size: var(--text-small); }
+  .hero-points { font-size: var(--text-body); }
+  .auth-intro { padding: 22px; }
+}

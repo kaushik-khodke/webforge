@@ -91,3 +91,268 @@
 /* Supabase connection and empty/error states */
 .auth-security-note{display:flex;align-items:center;gap:7px;color:#8e849b;font-size:var(--text-small);margin-top:18px}.auth-security-note svg{color:#8777ce}.auth-error{grid-column:1/-1;border:1px solid #f0d8d7;background:#fff6f4;color:#a95151;padding:10px 12px;border-radius:9px;font-size:var(--text-body);line-height:1.5}.auth-config{grid-column:1/-1;display:flex;align-items:center;gap:7px;border-radius:8px;padding:8px 10px;font-size:var(--text-caption)}.auth-config.not-configured{color:#987b55;background:#fbf6ed}.auth-config.configured{color:#60866a;background:#f0f8f1}.oauth-divider{grid-column:1/-1;display:flex;align-items:center;gap:10px;color:#a49daa;font-size:var(--text-small)}.oauth-divider span{height:1px;background:#eeeaf0;flex:1}.oauth-buttons{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:9px}.oauth-buttons button{border:1px solid #ebe7ee;background:#fff;border-radius:9px;padding:10px;color:#625b69;font-size:var(--text-body);font-weight:700;display:flex;justify-content:center;align-items:center;gap:8px}.oauth-buttons button:hover{background:#faf9fc;border-color:#d9d2e1}.google-g{font:700 var(--text-emphasis) Arial;color:#4285f4}.github-mark{font-size:var(--text-emphasis);color:#27242c}.loading-panel,.empty-state{padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;color:#898391;font-size:var(--text-body);line-height:1.55;min-height:150px}.loading-panel{flex-direction:row;min-height:90px}.empty-state b{color:#4e4857;font:700 var(--text-emphasis) Manrope,sans-serif}.empty-state-icon{width:38px;height:38px;border-radius:12px;background:#f3f0fb;color:#8879d6;display:grid;place-items:center}.empty-state .outline-button{margin-top:3px}.dark-spinner{border-color:#e6e1ec;border-top-color:#8879d6}.assistant-unavailable{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;color:#938c99;padding:30px}.assistant-unavailable b{color:#4c4655;font:700 var(--text-emphasis) Manrope}.assistant-unavailable>span{max-width:310px;font-size:var(--text-body);line-height:1.6}.offline-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#d0a26f}.static-prompt{cursor:default}.static-prompt:hover{transform:none}.auth-chip i{background:#78aa82;box-shadow:0 0 0 3px #eef6ef}
  .preview-publish-state{display:inline-flex;align-items:center;gap:6px;color:#7b6fc1;font-size:var(--text-caption);font-weight:700}
+
+/* Dashboard Call Action & Calling Animation */
+.dashboard-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+.call-action-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.call-button {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: 1px solid #059669;
+  color: #ffffff;
+  border-radius: 9px;
+  padding: 10px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: var(--text-body);
+  transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.28);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.call-button:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.38);
+}
+
+.call-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+}
+
+.call-button.is-calling {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+  border-color: #047857;
+  animation: call-btn-pulse 2s infinite ease-in-out;
+}
+
+.call-button.is-calling svg {
+  animation: call-icon-shake 1.2s ease-in-out infinite;
+}
+
+.calling-popup {
+  position: absolute;
+  top: calc(100% + 11px);
+  left: 0;
+  z-index: 100;
+  min-width: 280px;
+  background: #ffffff;
+  border: 1px solid #a7f3d0;
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: 0 16px 36px rgba(6, 95, 70, 0.16), 0 4px 10px rgba(0, 0, 0, 0.04);
+  animation: call-popup-in .3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top left;
+}
+
+.calling-popup::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 28px;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  border-left: 1px solid #a7f3d0;
+  border-top: 1px solid #a7f3d0;
+  transform: rotate(45deg);
+}
+
+.calling-popup-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.calling-avatar {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+}
+
+.calling-pulse-ring {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid #10b981;
+  pointer-events: none;
+  animation: call-pulse-ring 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.calling-pulse-ring.ring-2 {
+  animation-delay: 0.8s;
+}
+
+.calling-avatar-icon svg {
+  animation: call-icon-shake 1.2s ease-in-out infinite;
+}
+
+.calling-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.calling-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calling-heading strong {
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: #065f46;
+  letter-spacing: -0.2px;
+}
+
+.calling-subtext {
+  font-size: var(--text-caption);
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.calling-soundwave {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 14px;
+}
+
+.calling-soundwave span {
+  display: block;
+  width: 2.5px;
+  border-radius: 2px;
+  background: #10b981;
+  animation: call-soundwave 1s ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+.calling-soundwave span:nth-child(1) { height: 6px; animation-delay: 0s; }
+.calling-soundwave span:nth-child(2) { height: 12px; animation-delay: 0.2s; }
+.calling-soundwave span:nth-child(3) { height: 14px; animation-delay: 0.4s; }
+.calling-soundwave span:nth-child(4) { height: 8px; animation-delay: 0.15s; }
+
+.calling-dots span {
+  animation: call-dots-blink 1.4s infinite;
+  opacity: 0;
+}
+
+.calling-dots span:nth-child(1) { animation-delay: 0s; }
+.calling-dots span:nth-child(2) { animation-delay: 0.25s; }
+.calling-dots span:nth-child(3) { animation-delay: 0.5s; }
+
+.calling-end-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid #fecaca;
+  background: #fee2e2;
+  color: #dc2626;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all .2s ease;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.calling-end-btn:hover {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+  transform: scale(1.08);
+}
+
+@keyframes call-btn-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5), 0 4px 14px rgba(16, 185, 129, 0.28);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0), 0 6px 18px rgba(16, 185, 129, 0.38);
+  }
+}
+
+@keyframes call-popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes call-pulse-ring {
+  0% { transform: scale(0.9); opacity: 0.85; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes call-icon-shake {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(-14deg); }
+  30% { transform: rotate(14deg); }
+  45% { transform: rotate(-9deg); }
+  60% { transform: rotate(9deg); }
+  75% { transform: rotate(0deg); }
+}
+
+@keyframes call-soundwave {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes call-dots-blink {
+  0%, 20% { opacity: 0; }
+  50% { opacity: 1; }
+  80%, 100% { opacity: 0; }
+}
+
+@media(max-width:800px) {
+  .page-heading > .dashboard-header-actions {
+    margin-top: 21px;
+  }
+}
+
+@media(max-width:560px) {
+  .page-heading > .dashboard-header-actions {
+    margin-top: 13px;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .calling-popup {
+    left: auto;
+    right: 0;
+    transform-origin: top right;
+  }
+  .calling-popup::before {
+    left: auto;
+    right: 28px;
+  }
+}
+

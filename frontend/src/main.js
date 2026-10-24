@@ -41,6 +41,8 @@ const state = {
   chatAttachment: null,
   chatDraft: "",
   extractionStarted: new Set(),
+  isCalling: false,
+  callTimer: null,
 };
 
 const iconPaths = {
@@ -64,7 +66,51 @@ const iconPaths = {
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  phoneOff: '<path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="1" y1="1" x2="23" y2="23"/>',
 };
+
+let callAudioInterval = null;
+function startCallRingtone() {
+  stopCallRingtone();
+  function playToneBurst() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc1.type = "sine";
+      osc2.type = "sine";
+      osc1.frequency.setValueAtTime(440, ctx.currentTime);
+      osc2.frequency.setValueAtTime(480, ctx.currentTime);
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.05);
+      gain.gain.setValueAtTime(0.05, ctx.currentTime + 1.2);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.4);
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+      osc1.start(ctx.currentTime);
+      osc2.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 1.4);
+      osc2.stop(ctx.currentTime + 1.4);
+      setTimeout(() => ctx.close().catch(() => {}), 1600);
+    } catch {
+      // AudioContext unavailable or restricted
+    }
+  }
+  playToneBurst();
+  callAudioInterval = window.setInterval(playToneBurst, 3500);
+}
+
+function stopCallRingtone() {
+  if (callAudioInterval) {
+    clearInterval(callAudioInterval);
+    callAudioInterval = null;
+  }
+}
 
 function icon(name, size = 18) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name] || iconPaths.spark}</svg>`;
@@ -239,7 +285,7 @@ function dataErrorBlock(message) {
 }
 
 function patientDashboard() {
-  const action = `<button class="primary-button compact" data-route="patient/models">Explore models ${icon("arrow", 15)}</button>`;
+  const action = `<div class="dashboard-header-actions"><div class="call-action-wrapper"><button class="call-button compact ${state.isCalling ? "is-calling" : ""}" data-action="toggle-call" id="call-button" aria-expanded="${state.isCalling}" aria-label="${state.isCalling ? "Calling you, click to cancel" : "Get call from care team"}">${icon("phone", 15)} <span>${state.isCalling ? 'Calling you<span class="calling-dots"><span>.</span><span>.</span><span>.</span></span>' : "Get call"}</span></button>${state.isCalling ? `<div class="calling-popup" id="calling-popup" role="status" aria-live="polite"><div class="calling-popup-inner"><div class="calling-avatar"><span class="calling-pulse-ring ring-1"></span><span class="calling-pulse-ring ring-2"></span><span class="calling-avatar-icon">${icon("phone", 16)}</span></div><div class="calling-info"><div class="calling-heading"><strong>Calling you…</strong><div class="calling-soundwave" aria-hidden="true"><span></span><span></span><span></span><span></span></div></div><small class="calling-subtext">Care Team &amp; AI Companion</small></div><button class="calling-end-btn" data-action="toggle-call" title="End call" aria-label="End call">${icon("phoneOff", 14)}</button></div></div>` : ""}</div><button class="primary-button compact" data-route="patient/models">Explore models ${icon("arrow", 15)}</button></div>`;
   const first = escapeHtml(displayName());
   const docs = state.documentCount;
   const assessments = state.assessments.length;
@@ -933,7 +979,18 @@ document.addEventListener("click", async event => {
     return;
   }
   const routeButton = event.target.closest("[data-route]");
-  if (routeButton) { route(routeButton.dataset.route); return; }
+  if (routeButton) {
+    if (state.callTimer) {
+      window.clearTimeout(state.callTimer);
+      state.callTimer = null;
+    }
+    if (state.isCalling) {
+      state.isCalling = false;
+      stopCallRingtone();
+    }
+    route(routeButton.dataset.route);
+    return;
+  }
   const prompt = event.target.closest("[data-chat-prompt]");
   if (prompt) { const input = $("#chat-form input[name=message]"); state.chatDraft = prompt.dataset.chatPrompt; if (input) { input.value = state.chatDraft; input.focus(); } return; }
   const retryExtraction = event.target.closest("[data-extract-document]");
@@ -955,7 +1012,39 @@ document.addEventListener("click", async event => {
   if (action === "show-password") { const input = $("input[name=password]"); input.type = input.type === "password" ? "text" : "password"; event.target.textContent = input.type === "password" ? "Show" : "Hide"; }
   if (action === "forgot" && !state.authBusy) { state.authMode = "reset"; state.authError = ""; state.authNotice = ""; render(); }
   if (action === "back-to-login" && !state.authBusy) { state.authMode = "signin"; state.authError = ""; state.authNotice = ""; render(); }
-  if (action === "logout") await signOut();
+  if (action === "toggle-call") {
+    if (state.callTimer) {
+      window.clearTimeout(state.callTimer);
+      state.callTimer = null;
+    }
+    state.isCalling = !state.isCalling;
+    if (state.isCalling) {
+      startCallRingtone();
+      toast("Calling you…");
+      state.callTimer = window.setTimeout(() => {
+        state.isCalling = false;
+        stopCallRingtone();
+        state.callTimer = null;
+        render();
+      }, 3500);
+    } else {
+      stopCallRingtone();
+      toast("Call ended");
+    }
+    render();
+    return;
+  }
+  if (action === "logout") {
+    if (state.callTimer) {
+      window.clearTimeout(state.callTimer);
+      state.callTimer = null;
+    }
+    if (state.isCalling) {
+      state.isCalling = false;
+      stopCallRingtone();
+    }
+    await signOut();
+  }
   if (action === "open-menu") { state.mobileMenu = true; render(); }
   if (action === "close-menu") { state.mobileMenu = false; render(); }
   if (action === "notifications") toast("There are no new notifications.");

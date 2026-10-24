@@ -1,0 +1,26 @@
+# Dependencies and generated build output
+node_modules/
+dist/
+frontend/dist/
+frontend/.vite/
+
+# Local environment and private credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+
+# Supabase CLI state, local database, and generated types
+backend/supabase/.temp/
+backend/supabase/.branches/
+backend/supabase/.env
+backend/supabase/.env.*
+!backend/supabase/.env.example
+backend/supabase/seed.local.sql
+
+# Editor / operating system files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
